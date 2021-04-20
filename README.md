@@ -16,7 +16,7 @@ Find the most likely one
 
 # Contributing:
 
-I'll eventually try to set up a list of issues on a workboard taht people can volunteer to do.
+I'll eventually try to set up a list of issues on a workboard that people can volunteer to do.
 
 Some major style guidelines 
  - every function and class should have a docstring that explains what the thing does
@@ -29,3 +29,27 @@ And other major rules
  - raise exceptions at unexpected situations. The exception message should provide enough detail to debug 
  - always check inputs in functions. Use `isinstance` and not `type(...)==[...]` 
  - Always test your code before committing 
+
+## Some other suggestions
+
+### Classes 
+
+Be careful that class attributes are only modified when they are expected to. 
+ - For internal use, use names like `self._value` 
+ - Use getters and setters. For the getters use property decorators, ie 
+```
+def value(self):
+    return self._value
+```
+    this ensures things aren't accdentally changed. Similarly, for setters 
+```
+def set_value(self, value):
+    if not isinstance(value, [dtype]:
+        Logger.Fatal("...", ValueError)
+    self._value = value 
+```
+    so things don't get set to an unexpected value. This ensures we run into the problem exactly when it's relevant! 
+
+### Dependencies
+
+Try to avoid using bloated uncommon dependencies except where necessary. Numpy, scipy, and matplotlib should have everything we'll need! 
