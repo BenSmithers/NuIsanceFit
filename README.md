@@ -41,14 +41,14 @@ Be careful that class attributes are only modified when they are expected to.
 def value(self):
     return self._value
 ```
-    this ensures things aren't accdentally changed. Similarly, for setters 
+this ensures things aren't accdentally changed. Similarly, for setters 
 ```
 def set_value(self, value):
     if not isinstance(value, [dtype]:
         Logger.Fatal("...", ValueError)
     self._value = value 
 ```
-    so things don't get set to an unexpected value. This ensures we run into the problem exactly when it's relevant! 
+so things don't get set to an unexpected value. This ensures we run into the problem exactly when it's relevant! 
 
 ### Dependencies
 
