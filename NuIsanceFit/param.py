@@ -4,6 +4,8 @@ from numbers import Number # parent of all numbers
 
 from math import sqrt, pi, log
 
+from logger import Logger
+
 over_root_two_pi = 1./sqrt(2*pi)
 
 class Prior:
@@ -14,9 +16,9 @@ class Prior:
     These objects return the probabiltity density for a given sampled point 
     """
     def __init__(self):
-        raise NotImplementedError("Need to use derived class")
+        Logger.Fatal("Need to use derived class", NotImplementedError)
     def __call__(self):
-        raise NotImplementedError("Need to use derived class")
+        Logger.Fatal("Need to use derived class", NotImplementedError)
 
 def UniformPrior(Prior):
     """
@@ -24,9 +26,9 @@ def UniformPrior(Prior):
     """
     def __init__(self, minval=-np.inf, maxval=np.inf):
         if not isinstance(minval, Number):
-            raise TypeError("minval should be {}, not {}".format(float, type(minval)))
+            Logger.Fatal("minval should be {}, not {}".format(float, type(minval)), TypeError)
         if not isinstance(maxval, Number):
-            raise TypeError("maxval should be {}, not {}".format(float, type(maxval)))
+            Logger.Fatal("maxval should be {}, not {}".format(float, type(maxval)), TypeError)
         self.min = minval
         self.max = maxval
 
@@ -42,9 +44,9 @@ def GaussianPrior(Prior):
     """
     def __init__(self, mean, stddev):
         if not isinstance(mean, Number):
-            raise TypeError("mean should be {}, got {}".format(float, type(mean)))
+            Logger.Fatal("mean should be {}, got {}".format(float, type(mean)), TypeError)
         if not isinstance(stddev, Number):
-            raise TypeError("stddev should be {}, got {}".format(flota, type(stddev)))
+            Logger.Fatal("stddev should be {}, got {}".format(flota, type(stddev)), TypeError)
 
         self.mean = mean
         self.stddev = stdev
@@ -72,15 +74,15 @@ def Gaussian2DPrior(Prior):
     """
     def __init__(self, mean0, mean1, stddev0, stddev1, correlation):
         if not isinstance(mean0, Number):
-            raise TypeError("Expected {} for mean0, got {}".format(float, type(mean0)))
+            Logger.Fatal("Expected {} for mean0, got {}".format(float, type(mean0)), TypeError)
         if not isinstance(mean1, Number):
-            raise TypeError("Expected {} for mean1, got {}".format(float, type(mean1)))
+            Logger.Fatal("Expected {} for mean1, got {}".format(float, type(mean1)), TypeError)
         if not isinstance(stddev0, Number):
-            raise TypeError("Expected {} for stddev0, got {}".format(float, type(stddev0)))
+            Logger.Fatal("Expected {} for stddev0, got {}".format(float, type(stddev0)), TypeError)
         if not isinstance(stddev1, Number):
-            raise TypeError("Expected {} for stddev1, got {}".format(float, type(stddev1)))
+            Logger.Fatal("Expected {} for stddev1, got {}".format(float, type(stddev1)), TypeError)
         if not isinstance(correlation, Number):
-            raise TypeError("Expecte {} for correlation, got {}".format(float, type(correlation))) 
+            Logger.Fatal("Expecte {} for correlation, got {}".format(float, type(correlation)), TypeError) 
 
         self.mean0 = mean0
         self.mean1 = mean1 
@@ -139,15 +141,14 @@ class Param:
         for key in json_entry:
             # we only care about a few of these, and we want to do some basic checks
 
-            elif key=="center" or key=="width" or key=="min" or key=="max":
+            if (key=="center" or key=="width" or key=="min" or key=="max"):
                 if not isinstance(json_entry[key], Number):
-                    raise TypeError("{} must be {}, received {}".format(key, float, type(json_entry[key])))
-                
+                    Logger.Fatal("{} must be {}, received {}".format(key, float, type(json_entry[key])), TypeError)    
             elif key=="fit":
                 if not isinstance(json_entry[key], bool):
-                    raise TypeError("{} should be {}, received {}".format(key, bool, type(json_entry[key])))
+                    Logger.Fatal("{} should be {}, received {}".format(key, bool, type(json_entry[key])), TypeError)
             else:
-                continue # ignoring any arg I don't recognize
+                Logger.Warn("Found unrecognized key: {}".format(key))
 
             setattr(self, key, json_entry[key])
 
@@ -157,13 +158,13 @@ class Param:
 
         # make sure that the assigned values pass a very simple check
         if not self.width <= abs(self.max-self.min):
-            raise ValueError("Width of distribution is greater than width of allowed values. This must be wrong...")
+            Logger.Fatal("Width of distribution is greater than width of allowed values. This must be wrong...", ValueError)
 
         if self.center<self.min or self.center>self.max:
-            raise ValueError("Center of distribution is outside the range of allowed values.")
+            Logger.Fatal("Center of distribution is outside the range of allowed values.", ValueError)
 
         if self.max<self.min:
-            raise ValueError("Minimum is greater than maximum...")
+            Logger.Fatal("Minimum is greater than maximum...", ValueError)
 
     def __str__(self):
         return( "{}: center {}; width {}; min {}, max {}. Will {}Fit\n".format(self.name, self.center, self.width, self.min, self.max, "" if self.fit else "not "))
@@ -178,4 +179,5 @@ _params_raw = json.load(_params_file)
 
 params = {}
 for entry in _params_raw.keys():
+    Logger.Trace("Read new param: {}".format(str(entry)))
     params[str(entry)] = Param(_params_raw[entry])

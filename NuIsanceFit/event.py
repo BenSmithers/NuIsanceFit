@@ -1,4 +1,10 @@
 
+from logger import Logger
+
+"""
+Here, we describe the Event classes and methods for interacting with the events 
+"""
+
 class EventCache:
     """
     This object is used to cache various properties for the Event class 

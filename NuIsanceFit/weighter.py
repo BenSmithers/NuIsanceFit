@@ -1,6 +1,8 @@
 from Event import Event 
 from param import params as global_params
 
+from logger import Logger 
+
 """
 Here we design and implement classes to Weight events
 
@@ -11,10 +13,12 @@ The
 class Weighter:
     """
     A Default type from which all the weighters will be made. 
+
+    Structured such that Weighters can weight things of any type 
     """
     def __init__(self, dtype=float):
         if not isinstance(dtype, type):
-            raise TypeError("Arg 'dtype' must be {}, got {}".format(type, type(dtype))) # weird...
+            Logger.Fatal("Arg 'dtype' must be {}, got {}".format(type, type(dtype)), TypeError) # weird...
 
         self._dtype = dtype
 
@@ -27,19 +31,21 @@ class Weighter:
         Calculate the weight of the event
         """
         if not isinstance(event, Event):
-            raise TypeError("Expected {}, got {}".format(Event, type(event)))
+            Logger.Fatal("Expected {}, got {}".format(Event, type(event)), TypeError)
 
         return( self.dtype() )
 
     def __add__(self, other):
         """
-        Here, we combine two weighters into one super-weighter
+        Here, we combine two weighters into one meta-weighter
         This returns another Wighter object that evaluates the sum of the parent weighters' calculated weights 
         """
         if not isinstance(other, Weighter):
-            raise TypeError("Expected {}, got {}".format(Weighter, type(other)))
+            Logger.Fatal("Expected {}, got {}".format(Weighter, type(other)), TypeError)
 
-        # create default event 
+        Logger.Trace("Combining two weighters")
+    
+        # create default event. 
         ev = Event()
         dtype = type(other(ev) + self(ev))
         
@@ -125,8 +131,13 @@ class WeighterMaker:
 
     def __call__(self, params): 
 
+        Logger.Trace("Creating new metaWeighter")
+
+        Logger.Trace("Conv")
         conventionalComponent   = powerLawTiltWeighter(params["convNorm"]*1e5, -2.5 + params["CRDeltaGamma"])
+        Logger.Trace("Prompt")
         promptComponent         = powerLawTiltWeighter(params["promptNorm"]*1e5, -2.5 )
+        Logger.Trace("Astro")
         astroComponent          = powerLawTiltWeighter(params["astroNorm"]*1e5, -2.0 + params["astroDeltaGamma"])
 
         return( concentionalComponent + promptComponent + astroComponent )
