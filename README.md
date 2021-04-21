@@ -14,6 +14,9 @@ Parametrize nuisance parameters. Fit a given flux (data or MC) to those nuisance
 Calculate the LLHs for multiple different fluxes.
 Find the most likely one 
 
+The likelihood calculation is really tricky though. So to do this, we need known MC and unknown data. The nuisance parameters are used to reweigh the MC. Then we ask 'what is the likelihood we get this data given this flux prediction (MC)?' 
+So we move the nuisance parameters around until we can minimize that likelihood 
+
 # Contributing:
 
 I'll eventually try to set up a list of issues on a workboard that people can volunteer to do.
