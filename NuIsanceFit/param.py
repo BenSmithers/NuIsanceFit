@@ -13,7 +13,7 @@ class Prior:
     These objects represent possible prior distributions for the parameters.
     Implementations should derive from this base class and re-implement the initializer and call functions
 
-    These objects return the probabiltity density for a given sampled point 
+    These objects return the probabiltity density for a given sampled point in LOG space 
     """
     def __init__(self):
         Logger.Fatal("Need to use derived class", NotImplementedError)
@@ -114,6 +114,7 @@ def LimitedGaussian2DPrior(Prior):
     def __call__(x):
         return self.limits0(x) + self.limits1(x) + self.prior(x)
 
+
 class Param:
     """
     Basic Fit parameter datatype
@@ -129,13 +130,13 @@ class Param:
         """
 
         # Defaults 
-        self.center = 0.0 
-        self.width  = 1.0
-        self.min    = -np.inf
-        self.max    = np.inf
+        self._center = 0.0
+        self._width  = 1.0
+        self._min    = -np.inf
+        self._max    = np.inf
 
         # should this be used in the fit? 
-        self.fit = False
+        self._fit = False
 
         # try assigning these from the keywords passed to this constructor
         for key in json_entry:
@@ -150,10 +151,10 @@ class Param:
             else:
                 Logger.Warn("Found unrecognized key: {}".format(key))
 
-            setattr(self, key, json_entry[key])
+            setattr(self, "_"+key, json_entry[key])
 
         if self.width == -1 or self.width==-1.0:
-            self.width = np.inf
+            self._width = np.inf
 
 
         # make sure that the assigned values pass a very simple check
@@ -166,11 +167,35 @@ class Param:
         if self.max<self.min:
             Logger.Fatal("Minimum is greater than maximum...", ValueError)
 
+        self._value = self._center
+
+        if not (np.isinf(self.min) or np.isinf(self.max)):
+            self.prior = GaussianPrior(self.mean, self.width)
+        else:
+            self.prior = LimitedGaussianPrior(self.mean, self.width, self.min, self.max)
+
+    @property 
+    def center(self):
+        return self._center
+
+    @property 
+    def width(self):
+        return self._width
+
+    @property 
+    def min(self):
+        return self._min
+
+    @property 
+    def max(self):
+        return self._max
+
     def __str__(self):
         return( "{}: center {}; width {}; min {}, max {}. Will {}Fit\n".format(self.name, self.center, self.width, self.min, self.max, "" if self.fit else "not "))
 
     def __repr__(self):
         return self.__str__()
+
 
 
 _params_filepath = os.path.join(os.path.dirname(__file__),"resources","parameters.json")
@@ -181,3 +206,52 @@ params = {}
 for entry in _params_raw.keys():
     Logger.Trace("Read new param: {}".format(str(entry)))
     params[str(entry)] = Param(_params_raw[entry])
+
+class paramPoint:
+    """
+    Set of values corresponding to the loaded parameters. Has a value for each parameter
+    """
+    def __init__(self, **kwargs):
+        """
+        Create this object, set the attributes corresponding to the centers loaded in from the json file 
+        """
+        self.valid_keys = list(params.keys())
+
+        for key in params.keys():
+            setattr(self, str(key), params[key].center)
+
+        # now set any non-default arguments 
+        for kwarg in kwargs:
+            if hasattr(self, kwarg):
+                setattr(self, kwarg, kwargs[kwarg])
+
+    def get_dict(self):
+        """
+        Returns a dictionary of the parameters
+        """
+        pass
+
+    def set(self, attr, value):
+        """
+        Sets the attribute "attr" to the value "value"
+        """
+        if not hasattr(self, attr):
+            Logger.Fatal("Unfamiliar parameter: {}".format(attr))
+
+        # ensure the type is valid 
+        if not isinstance( value, type(getattr(self, attr))):
+            Logger.Fatal("Value {} is of invalid type {}, not {}".format(value, type(value), type(getattr(self,attr))))
+    
+        setattr(self, attr, value)
+
+
+class LLHSet:
+    def __init__(self):
+        self.ice_gradient_joined_prior = Gaussian2DPrior
+
+    def __call__(self, these_params):
+        value = 0.0
+        for key in params:
+            value += params[param].prior( these_params[param] )
+
+
