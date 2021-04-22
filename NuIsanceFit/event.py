@@ -47,6 +47,8 @@ class Event:
 
         self._year = 0
 
+        self._cachedweight = EventCache()
+
     @property
     def primaryEnergy(self):
         return self._primaryEnergy
@@ -63,6 +65,17 @@ class Event:
     def totalColumnDepth(self):
         return self._totalColumnDepth
 
+    def _get_meta_weight(self):
+        return self._cachedweight.convWeight + self._cachedweight.promptWeight + self._cachedweight.astroMuWeight
+
+    def __add__(self, other):
+        meta_weight = self._get_meta_weight
+        if np.isnan(meta_weight) or meta_weight<0:
+            Logger.Fatal("Found invalid metaweight! {}".format(meta_weight))
+    def __eq__(self, other):
+        pass
+    def __mul__(self, other):
+        pass
 
 def buildEventFromData(self, dataEvent):
     raise NotImplementedError("Still need to implement this")
