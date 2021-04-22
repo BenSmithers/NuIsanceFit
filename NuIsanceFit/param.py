@@ -245,13 +245,27 @@ class paramPoint:
         setattr(self, attr, value)
 
 
-class LLHSet:
+class PriorSet:
     def __init__(self):
-        self.ice_gradient_joined_prior = Gaussian2DPrior
+        self.astro_cor = 0.70
+        self.icegrad_cor = 5.091035738186185100e-02
+        self.ice_gradient_joined_prior = Gaussian2DPrior(params["icegrad0"].center, params["icegrad1"].center,\ 
+                                                         params["icegrad0"].width, params["icegrad1"].center,\
+                                                         self.icegrad_cor)
+        self.astro_correlated_prior    = Gaussian2DPrior(params["astro1Comp2DNorm"].center, params["astro1Comp2DDeltaGamma"].center,\
+                                                         params["astro1Comp2DNorm"].width,  params["astro1Comp2DDeltaGamma"].width, \
+                                                         self.astro_cor)
 
     def __call__(self, these_params):
         value = 0.0
+        # add up contributions from the procedural ones
         for key in params:
             value += params[param].prior( these_params[param] )
+
+        # add up contributions from the 2D ones 
+        value += self.ice_gradient_joined_prior( these_params["icegrad0"], these_params["icegrad1"] )
+        value += self.astro_correlated_prior( these_params["astro1Comp2DNorm"], these_params["astro1Comp2DDeltaGamma"])
+
+
 
 

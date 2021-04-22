@@ -54,6 +54,16 @@
         "center":0.0,
         "width":-1
     },
+    "astro1Comp2DNorm":{
+        "fit":false,
+        "center":0.786666666,
+        "Width":0.36
+    },
+    "astro1Comp2DDeltaGamma":{
+        "fit":false,
+        "center":0.00,
+        "width":0.36
+    },
     "cutoffEnergy":{
         "fit":false,
         "center":1.0,
