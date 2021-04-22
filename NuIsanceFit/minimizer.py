@@ -13,6 +13,9 @@ SAYLikelihood
 from param import paramPoint
 from logger import Logger 
 from weighter import Weighter
+from weighter import WeighterMaker as simWeighterMaker
+
+from event import Event
 
 from math import log, lgamma, log1p
 #lgamma - log of gamma function
@@ -69,6 +72,41 @@ for minLLH
 
 The do fit thing uses our overall likelihood problem and the LBFGSB_Driver minimizer
 """
+_event_type = Event
+_hist_type = np.ndarray
+_bin_type = np.ndarray
+_array_dims = 5
+def _verify_array_shape(array):
+    """
+    This function makes sure that whatever we're sending in as our simulation or observation is all formatted correctly.
+    This ensures we know the exact kinda data we're working with 
+    """
+    if not isinstance(array, _hist_type):
+        Logger.Warn("Incorrect Histogram Type: {}".format(type_arry))
+        return False
+
+    shape = np.shape(array)
+    if len(shape)!=_array_dims:
+        Logger.Warn("Incorrect shape: {}".format(shape))
+        return False
+
+    # Guaranteed 5-d array
+    # each bin needs to hold bins
+    if array.dtype!=_bin_type:
+        Logger.Warn("Incorrect bin type: {}".format(array.dtype))
+        return False
+
+    # the bins should be iterable... 
+    for entry in array.flat:
+        if not isinstance(entry, _bin_type):
+            Logger.Warn("This should be unreachable... since this should've already been found! ")
+            return False
+        if entry.dtype!=_event_type:
+            Logger.Warn("Bin Event type should be {}, found {}".format(_event_type, entry.dtype))
+            return False
+
+    return True
+
 
 class llhMachine:
     def __init__(self):
@@ -76,22 +114,74 @@ class llhMachine:
         Take in the 
         """
         self._minimum = None # only non-None type when minimized 
-    
-        self._simweighter = None
-        self._dataweighter = None
-        self._simulation = None
+   
+        self._obshist = None
+        self._simhist = None 
+
+        self._simWeighterMaker = None
+        self.setSimWeighterMaker( simWeighterMaker )
+        self._dataWeighterMaker = None
+
+        self._simulation = None # list/tuple of data 
+        self._observation = None # singular histogram of data
+
+        self._seeds = None # list of seeds
+
+        self._llhfunc = None
+        self.setLikelihoodFunc( SAYLikelihood )
+
+    # OG GolemFit uses a 5-dimensional array of bins. Bins contained events. So let's do that too
+    def setSimulation(self, simulation):
+        if not _verify_array_shape(simulation):
+            Logger.Fatal("Cannot configure with this simulation histogram.")
+        else:
+            self._simulation = simulation
+    @property 
+    def simulation(self):
+        return self._simulation
+
+    def setObservation(self, observation):
+        if not _verify_array_shape(observation):
+            Logger.Fatal("Cannot configure with this observation histogram")
+        else:
+            self._observation = observation
+    @property
+    def observation(self):
+        return self._observation 
 
 
-    def validate(self):
+    def setSimWeighterMaker(self, weighter):
+        pass
+    @property
+    def simWeighterMaker(self):
+        return self._simweighter
+
+    def setDataWeighterMaker(self, weighter):
+        pass 
+    @property
+    def dataWeighterMaker(self):
+        return self._dataweighter
+
+    def setLikelihoodFunc(self, llhfunc):
+        if not hasattr(llhfunc, "__call__"):
+            Logger.Fatal("LikelihoodFunc needs to be callable",TypeError)
+
+        self._llhfunc = llhfunc
+    @property
+    def likelihoodFunc(self):
+        return self._llhfunc
+
+
+    def _validate(self):
         if not isinstance(self._simweighter, Weighter):
             Logger.Fatal("SimWeighter should be {}, not {}".format(Weighter, type(self._simweighter)), TypeError)
         
         #TODO  need to validate the other things!
 
-    def likelihoodCore(self):
+    def _likelihoodCore(self):
         pass
 
-    def evaluateLikelihood(self):
+    def _evaluateLikelihood(self):
        pass 
 
     def minimize(self):
