@@ -32,6 +32,7 @@ And other major rules
  - raise exceptions at unexpected situations. The exception message should provide enough detail to debug 
  - always check inputs in functions. Use `isinstance` and not `type(...)==[...]` 
  - Always test your code before committing 
+ - Do **not** import anything into the global namespace. No `from numpy import *` allowed. 
 
 ## Some other suggestions
 
