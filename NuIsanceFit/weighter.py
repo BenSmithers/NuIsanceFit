@@ -127,6 +127,12 @@ class WeighterMaker:
     Note that the weights are only meaningful in a relative sense. We don't care about constants 
     """
     def __init__(self):
+        """
+        This function will load in and cache anything needed to make the Weighters.
+        Splines and stuff... 
+
+        nothing right now, but soon! 
+        """
         pass
 
     def __call__(self, params): 

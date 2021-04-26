@@ -25,6 +25,9 @@ import numpy as np
 from numbers import Number 
 
 
+"""
+These three likelihood functions are from Phystools, don't have much to say about them. 
+"""
 def gammaPriorPoissonLikelihood(k, alpha, beta):
     val = alpha*log(beta)
     val += lgamma(k+alpha)
@@ -107,11 +110,10 @@ def _verify_array_shape(array):
 
     return True
 
-
 class llhMachine:
     def __init__(self):
         """
-        Take in the 
+        Machine for calculating the likelihood of an observation, given simulation, for a set of parameters  
         """
         self._minimum = None # only non-None type when minimized 
    
@@ -129,6 +131,8 @@ class llhMachine:
 
         self._llhfunc = None
         self.setLikelihoodFunc( SAYLikelihood )
+
+    # ========================== Getters and Setters ===============================
 
     # OG GolemFit uses a 5-dimensional array of bins. Bins contained events. So let's do that too
     def setSimulation(self, simulation):
@@ -177,6 +181,8 @@ class llhMachine:
             Logger.Fatal("SimWeighter should be {}, not {}".format(Weighter, type(self._simweighter)), TypeError)
         
         #TODO  need to validate the other things!
+
+    # ================================ Parts that actually do things =====================
 
     def _likelihoodCore(self):
         pass
