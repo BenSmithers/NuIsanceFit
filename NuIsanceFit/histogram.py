@@ -140,7 +140,10 @@ class bhist:
 
             return tuple(bin_loc)
 
-
+    def __getitem__(self, index):
+        if not isinstance(index, int):
+            Logger.Fatal("Cannot access entry of type {}".format(type(index)),TypeError)
+        return self._fill[index]
 
     def __iter__(self):
         return iter(self._fill)
