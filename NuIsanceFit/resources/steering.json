@@ -1,0 +1,25 @@
+{
+    "binning":{
+        "energy":{
+            "min":4.78,
+            "max":1e7,
+            "binWidth":0.111,
+            "log":true
+        },
+        "cosTh":{
+            "min":-1,
+            "max":1,
+            "binWidth":0.2,
+            "log":false
+        },
+        "azimuth":{
+            "min":0.0,
+            "max":6.283185,
+            "binWidth":6.283185,
+            "log":false
+        },
+        "year":{
+
+        }
+    }
+}
