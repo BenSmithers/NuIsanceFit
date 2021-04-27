@@ -10,10 +10,11 @@ CPrior
 SAYLikelihood
 """
 
-from param import paramPoint
+from param import paramPoint, PriorSet
 from logger import Logger 
 from weighter import Weighter
 from weighter import WeighterMaker as simWeighterMaker
+from nuthread import ThreadManager
 
 from event import Event
 
@@ -36,27 +37,32 @@ def gammaPriorPoissonLikelihood(k, alpha, beta):
     val += -lgamma(alpha)
     return val
 
-def poissonLikelihood(dataCount, lambdaVal):
-    if lambdaVal==0:
-        return( 0 if dataCount==0 else -np.inf )
+def poissonLikelihood(dataCount, lambdaVal, dtype=float):
+    zero = dtype()
+    one = dtype(1.0)
+    if lambdaVal==zero:
+        return( zero if dataCount==zero else -np.inf )
     else:
         sum_val = lambdaVal + lgamma(dataCount+1)
         return(dataCount*log(lambdaVal) - sum_val)
 
 
-def SAYLikelihood(k, w_sum, w2_sum):
-    if (w_sum<=0 or w2_sum<0):
-        return( 0 if k==0 else -np.inf)
-    if (w2_sum==0):
-        return poissonLikelihood(k, w_sum)
+def SAYLikelihood(k, w_sum, w2_sum, dtype=float):
+    zero = dtype()
+    one = dtype(1.0)
 
-    if (w_sum==0):
-        if (k==0):
-            return 0.0
+    if (w_sum<=zero or w2_sum<zero):
+        return( zero if k==zero else -np.inf)
+    if (w2_sum==zero):
+        return poissonLikelihood(k, w_sum, dtype)
+
+    if (w_sum==zero):
+        if (k==zero):
+            return zero
         else:
             return -np.inf
 
-    alpha = w_sum*w_sum/w2_sum + 1.0
+    alpha = w_sum*w_sum/w2_sum + one 
     beta = w_sum/w2_sum
 
     return gammaPriorPoissonLikelihood(k,alpha,beta)
@@ -117,9 +123,16 @@ class llhMachine:
         """
         self._minimum = None # only non-None type when minimized 
    
+        self._prior = PriorSet()
+        self._includePriors
+
         self._obshist = None
         self._simhist = None 
 
+        self._dataWeighter = None
+        self._simWeighter = None
+
+        self._weighttype = float
         self._simWeighterMaker = None
         self.setSimWeighterMaker( simWeighterMaker )
         self._dataWeighterMaker = None
@@ -130,9 +143,14 @@ class llhMachine:
         self._seeds = None # list of seeds
 
         self._llhfunc = None
+        self._llhdtype = float
         self.setLikelihoodFunc( SAYLikelihood )
 
     # ========================== Getters and Setters ===============================
+    @property
+    def prior(self):
+        return self._prior
+
 
     # OG GolemFit uses a 5-dimensional array of bins. Bins contained events. So let's do that too
     def setSimulation(self, simulation):
@@ -158,13 +176,13 @@ class llhMachine:
         pass
     @property
     def simWeighterMaker(self):
-        return self._simweighter
+        return self._simWeighterMaker
 
     def setDataWeighterMaker(self, weighter):
         pass 
     @property
     def dataWeighterMaker(self):
-        return self._dataweighter
+        return self._dataWeighterMaker
 
     def setLikelihoodFunc(self, llhfunc):
         if not hasattr(llhfunc, "__call__"):
@@ -184,11 +202,83 @@ class llhMachine:
 
     # ================================ Parts that actually do things =====================
 
-    def _likelihoodCore(self):
-        pass
+    def _likelihoodCore(self, pairs):
+        """
+        This is the function called by the threader. 
 
-    def _evaluateLikelihood(self):
-       pass 
+        It gets passed a stack of observation and simulation bins! 
+        """
+        llh = self._llhdtype(0.0)
+
+        for entry in pairs:
+            if len(entry)!=2:
+                Logger.Fatal("Found unexpected length for sim/obs pair, {}".format(len(entry)), ValueError)
+            # these are bin objects, they have events 
+            this_obs = entry[0] 
+            this_sim = entry[1]
+
+            # get total weight of events oveserved in this bin
+            observationAmount = sum([self._dataWeighter(event) for event in this_obs])
+
+            # get the expectation here 
+            expectationWeights = [self._weightType() for event in this_sim]
+            expectationSqWeights = [self._weightType() for event in this_sim]
+
+            n_events = 0
+            for i_event in range(len(his_sim)):
+                event = this_sim[i_event]
+                w = self.simWeighter(event)
+                assert(w>=0)
+                w2 = w*w
+                assert(w2>=0)
+                n_events += event.num_events
+                expectationWeights[i_event] = w
+                expectationSqWeights[i_event] = w2
+
+                if np.isnan(w):
+                    Logger.Warn("Bad Weight {} for Event {}".format(w, event))
+                if np.isnan(event.num_events):
+                    Logger.Warn("Bad num_events {} for Event {}".format(event.num_events, event))
+
+            # using numpy sum since python default sum only works on number-likes
+            # this should work on anything with a defined "+" operation 
+            w_sum = np.sum(expectationWeights)
+            w2_sum = np.sum(expectationSqWeights)
+
+            llh += self.likelihoodFunc(observationAmount, w_sum, w2_sum, self._llhdtype)
+        
+        return llh
+
+    def _evaluateLikelihood(self, params):
+        """
+        Here, we take our binned histograms. We separate them along the first axis, flatten along the other four axes. 
+        Then we use the core function 
+        """
+        Logger.Thread("Making sim/data Weighters")
+        self._dataWeighter = self.dataWeighterMaker(params)
+        self._simWeighter = self.simWeighterMaker(params)
+ 
+        # If this is outside our valid parameter space, BAIL OUT
+        prior_param = self.prior(params)
+        if np.isnan(prior_param):
+            return(-np.inf) 
+
+        # we flatten these out into big stacks of bins 
+        # may want to change this a bit if it turns out the first axis only has a length ~2-6 
+        if len(self.observation)<10:
+            Logger.Warn("Observation and Simulation axis0 is only length {}".format(len(self.observation)))
+
+        llh = prior_param if self._includePriors else self._llhdtype(0.0)
+
+        # this is a deterministic process, so the bin ordering shouldn't be affected 
+        flat_obs = np.array([axis0.flatten() for axis0 in self.observation])
+        flat_sim = np.array([axis0.flatten() for axis0 in self.simulation])
+       
+        Logger.Thread("Starting up Threader for LLH calculation")
+        # now prepare these into pairs of stacks for the threading     
+        llh += ThreadManager( self._likelihoodCore, np.transpose([flat_obs, flat_sim]))
+        
+        return(llh)
 
     def minimize(self):
         """
@@ -196,6 +286,7 @@ class llhMachine:
 
         Need to use a minimization driver 
         """
+
 
         return paramPoint()
 
