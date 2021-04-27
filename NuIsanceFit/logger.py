@@ -5,7 +5,23 @@ from datetime import datetime
 Bringing in this logger from another [project of mine](https://github.com/BenSmithers/MultiHex/blob/Smithers/MapModeProto/MultiHex/logger.py)
 
 This way we can keep a written file with the output from running this project 
+In short, this opens up a file in the user's home or local directory, under a subfolder "NuIsanceFit"
+In the code base, one can write messages to this log file at various levels of severity:
+    Trace - call this basically whenever. It's used for debugging  (4)
+    Log   - Sporadically call this to track the overall progress (3)
+    Warn  - something might be wrong, but we can carry on (2)
+    Fatal - raises an exception (1)
+
+You can log by doing 
+    Logger.Log("This is your message")
+or by swapping out "Log" with a different level. Fatal should be called with an exception type 
+    Logger.Fatal("Bad number error", ValueError) 
+
+The logger will log (written to file, and to the terminal) anything at this log level or below
+It includes the type of log, a timestamp, and the message
 """
+
+log_level = 3
 
 def get_base_dir():
     # set up the save directory
@@ -50,8 +66,14 @@ class LoggerClass:
         """
         if not hasattr(target, "__call__"):
             self.Fatal("Cannot pipe to a non-callable", TypeError)
-
+         
         self.pipe = target
+        try:
+            self.Log("Successfully Connected Pipe")
+        except Exception as err:
+            self.pipe = None
+            self.Warn("Failed to connect pipe. Exception {}".format(err))
+
 
     def _log(self,level,message):
         """
@@ -101,6 +123,6 @@ class LoggerClass:
 
 
 # may want to have these settings changed in some config file? 
-Logger = LoggerClass(level=3,visual=True)
+Logger = LoggerClass(level=log_level,visual=True)
 Logger.Log("Logger Initialized, Testing Log")
 Logger.Log("Successfully Logging")
