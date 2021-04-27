@@ -9,7 +9,6 @@ Here we design and implement classes to Weight events
 The 
 """
 
-
 class Weighter:
     """
     A Default type from which all the weighters will be made. 
@@ -96,6 +95,7 @@ class Weighter:
 
         return(metaWeighter(dtype))
 
+# ======================= Implemented Weighters ==================================
 
 class powerLawTiltWeighter(Weighter):
     def __init__(self, medianEnergy, deltaIndex):
@@ -120,6 +120,29 @@ class brokenPowerlawTiltWeighter(powerLawTiltWeighter):
         return 5 
 
 
+class simpleDataWeighter(Weighter):
+    def __init__(self, dtype=float):
+        Weighter.__init__(self, dtype)
+    def __call__(self, event):
+        return event.cachedWeight.weight
+
+"""
+TODO: 
+    cachedValueWeighter
+    antiparticleWeighter
+    DOMEffWeighter
+    holeIceWeighter
+    atmosphericDensityUncertainty weighter
+    kaonLossesUncertainty weighter 
+    icegradient weighter 
+    attenuationWeighter
+
+This will require some spline stuff 
+
+Should probably also restructure these weighters to be built from a params object that just reads in what it needs - rather than a list of parameters! 
+"""
+
+# ========================= Weighter Maker Code =====================================
 class WeighterMaker:
     """
     This object can take a set of parameters and create a Meta-MetaWeighter that weights events according to that set of parameters 
