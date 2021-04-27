@@ -14,6 +14,7 @@ from param import paramPoint, PriorSet
 from logger import Logger 
 from weighter import Weighter
 from weighter import WeighterMaker as simWeighterMaker
+from histogram import bhist, eventBin
 from nuthread import ThreadManager
 
 from event import Event
@@ -82,9 +83,10 @@ for minLLH
 The do fit thing uses our overall likelihood problem and the LBFGSB_Driver minimizer
 """
 _event_type = Event
-_hist_type = np.ndarray
-_bin_type = np.ndarray
-_array_dims = 5
+_hist_type = bhist
+_bin_type = eventBin
+#  energy, cos(zenith), azimuth, year 
+_array_dims = 4
 def _verify_array_shape(array):
     """
     This function makes sure that whatever we're sending in as our simulation or observation is all formatted correctly.
