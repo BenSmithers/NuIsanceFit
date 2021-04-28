@@ -25,6 +25,12 @@ class eventBin:
         else:
             Logger.Fatal("Cannot perform '+' with {}".format(type(event)))
 
+    def __iter__(self):
+        return iter(self._contains)
+
+    def __getitem__(self, index):
+        return self._contains[index]
+
 def build_arbitrary_list(dims, dtype):
     """
     This allows us to build an array of arbitrary dimension (dims)
