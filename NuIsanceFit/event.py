@@ -1,10 +1,10 @@
 import enum
 from logger import Logger
+from numbers import Number 
 
 """
 Here, we describe the Event classes and methods for interacting with the events 
 """
-
 
 class EventCache:
     """
@@ -68,6 +68,91 @@ class Event:
         self._cachedweight = EventCache()
 
     # =================== Getters and Setters =======================
+    """
+    Check that the object's type is right, and then check that it's a physical value. 
+
+    All of these work the same exact way
+    """
+    def setPrimaryEnergy(self, energy):
+        if not isinstance(energy, Number):
+            Logger.Fatal("Cannot set energy to {}".format(type(energy)))
+        if energy<0:
+            Logger.Fatal("Cannot set negative energy {}".format(energy))
+        self._primaryEnergy = energy
+    def setPrimaryAzimuth(self, azimuth):
+        if not isinstance(azimuth, Number):
+            Logger.Fatal("Cannot set azimuth to {}".format(type(azimuth)))
+        if (azimuth<0) or (azimuth>2*pi):
+            Logger.Fatal("Invalid azimuth: {}. Is this degrees? Should be radians!".format(azimuth))
+        self._primaryAzimuth = azimuth
+    def setPrimaryZenith(self, zenith):
+        if not isinstance(zenith, Number):
+            Logger.Fatal("Cannot set zenith to {}".format(type(zenith)))
+        if (zenith<0) or (zenith>pi):
+            Logger.Fatal("Invalid zenith {}. Is this in degrees? It should be radians!".format(zenith))
+        self._primaryZenith =zenith
+    def setTotalColumnDepth(self, totalColumnDepth):
+        if not isinstance(totalColumnDepth, Number):
+            Logger.Fatal("TCD needs to be a number, not {}".format(type(totalColumnDepth)))
+        if totalColumnDepth<0:
+            Logger.Fatal("TCD cannot be negative".format(totalColumnDepth))
+        self._totalColumnDepth = totalColumnDepth
+    def setIntX(self, intX):
+        if not isinstance(intX, Number):
+            Logger.Fatal("Bjorken X should be a number, not {}".format(type(intX)))
+        if intX<0:
+            Logger.Fatal("Cannot have negative Bjorken X {}".format(intX))
+        self._intX = intX
+    def setIntY(self, intY):
+        if not isinstance(intY, Number):
+            Logger.Fatal("Bjorken Y should be a number, not {}".format(type(intY)))
+        if intX<0:
+            Logger.Fatal("Cannot have negative Bjorken Y {}".format(intY))
+        self._intY = intY
+    def setOneWeight(self, oneWeight):
+        if not isinstance(oneWeight, Number):
+            Logger.Fatal("OneWeight should be a number, not {}".format(type(oneWeight)))
+        if oneWeight<0:
+            Logger.Fatal("Cannot have negative oneWeight {}".format(oneWeight))
+        self._oneWeight = oneWeight
+    def setNumEvents(self, num_events):
+        if not isinstance(num_events, int):
+            Logger.Fatal("NumEvents should be an int, not {}".format(type(num_events)))
+        if num_events<0:
+            Logger.Fatal("Cannot have negative number of events {}".format(num_events))
+        self._num_events = num_events
+    def setEnergy(self, energy):
+        if not isinstance(energy, Number):
+            Logger.Fatal("Cannot set energy to {}".format(type(energy)))
+        if energy<0:
+            Logger.Fatal("Cannot set negative energy {}".format(energy))
+        self._energy = energy
+    def setAzimuth(self, azimuth):
+        if not isinstance(azimuth, Number):
+            Logger.Fatal("Cannot set azimuth to {}".format(type(azimuth)))
+        if (azimuth<0) or (azimuth>2*pi):
+            Logger.Fatal("Invalid azimuth: {}. Is this degrees? Should be radians!".format(azimuth))
+        self._azimuth = azimuth
+    def setZenith(self, zenith):
+        if not isinstance(zenith, Number):
+            Logger.Fatal("Cannot set zenith to {}".format(type(zenith)))
+        if (zenith<0) or (zenith>pi):
+            Logger.Fatal("Invalid zenith {}. Is this in degrees? It should be radians!".format(zenith))
+        self._zenith =zenith
+    def setTopology(self, topology):
+        if not isinstance(topology, int):
+            Logger.Fatal("Topology should be an int, not {}".format(type(topology)))
+        if topology not in [0,1]:
+            Logger.Fatal("Invalid topology {}, only 0 and 1 allowed".format(topology))
+        self._topology = topology
+    def setYear(self, year):
+        if not isinstance(year, int):
+            Logger.Fatal("Year should be an int, not {}".format(type(year)))
+        if year<0:
+            Logger.Fatal("Cannot have negative year {}".format(year))
+        self._year = year
+
+
     @property
     def primaryEnergy(self):
         return self._primaryEnergy
