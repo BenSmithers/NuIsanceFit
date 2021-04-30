@@ -1,8 +1,6 @@
 from logger import Logger
 from event import Event 
 
-from cascade.utils import get_loc
-
 import numpy as np
 
 class eventBin:
@@ -78,6 +76,48 @@ def itemget(source, binloc):
     else:
         return itemget(source, binloc[:1])
 
+def get_loc(x, domain):
+    """
+    Returns the indices of the entries in domain that border 'x' 
+    Raises exception if x is outside the range of domain 
+
+    Assumes 'domain' is sorted! And this _only_ works if the domain is length 2 or above 
+
+    Uses a binary search algorithm
+    """
+    if not isinstance(domain, (tuple,list,np.ndarray)):
+        raise TypeError("'domain' has unrecognized type {}, try {}".format(type(domain), list))
+    if not isinstance(x, (float,int)):
+        raise TypeError("'x' should be number-like, not {}".format(type(x)))
+
+    if len(domain)<=1:
+        raise ValueError("get_loc function only works on domains of length>1. This is length {}".format(len(domain)))
+
+    if x<domain[0] or x>domain[-1]:
+        raise ValueError("x={} and is outside the domain: ({}, {})".format(sci(x), sci(domain[0]), sci(domain[-1])))
+
+    min_abs = 0
+    max_abs = len(domain)-1
+
+    lower_bin = int(abs(max_abs-min_abs)/2)
+    upper_bin = lower_bin+1
+
+    while not (domain[lower_bin]<=x and domain[upper_bin]>=x):
+        if abs(max_abs-min_abs)<=1:
+            Logger.Log("Was {} in {}",format(x, domain))
+            Logger.Fatal("get_loc failed. Was the data unsorted?",Exception)
+
+        if x<domain[lower_bin]:
+            max_abs = lower_bin
+        if x>domain[upper_bin]:
+            min_abs = upper_bin
+
+        # now choose a new middle point for the upper and lower things
+        lower_bin = min_abs + int(abs(max_abs-min_abs)/2)
+        upper_bin = lower_bin + 1
+
+    assert(x>=domain[lower_bin] and x<=domain[upper_bin])
+    return(lower_bin, upper_bin)
 
 
 class bhist:
@@ -137,8 +177,10 @@ class bhist:
                 raise TypeError("Expected {}, got {}. Tried casting to {}, but failed.".format(self._dtype, type(amt), self._dtype))
         else:
             amount = amt
-
+        
+        # note: get_loc returns the indices of the edges that border this point. So we grab the left-edge; the bin number
         bin_loc = tuple([get_loc( args[i], self._edges[i])[0] for i in range(len(args))]) # get the bin for each dimension
+
         # Verifies that nothing in the list is None-type
         if all([x is not None for x in bin_loc]):
             # itemset works like ( *bins, amount )
