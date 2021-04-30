@@ -217,32 +217,39 @@ class paramPoint:
         """
         self.valid_keys = list(params.keys())
 
+        self.values = {}
+
         for key in params.keys():
-            setattr(self, str(key), params[key].center)
+            self.values[str(key)] = params[key].center
 
         # now set any non-default arguments 
         for kwarg in kwargs:
-            if hasattr(self, kwarg):
-                setattr(self, kwarg, kwargs[kwarg])
-
-    def get_dict(self):
-        """
-        Returns a dictionary of the parameters
-        """
-        pass
+            if kwarg in self.values:
+                self.values[kwarg] = kwargs[kwarg]
 
     def set(self, attr, value):
         """
         Sets the attribute "attr" to the value "value"
         """
-        if not hasattr(self, attr):
+        if not (attr in self.values):
             Logger.Fatal("Unfamiliar parameter: {}".format(attr))
 
         # ensure the type is valid 
-        if not isinstance( value, type(getattr(self, attr))):
-            Logger.Fatal("Value {} is of invalid type {}, not {}".format(value, type(value), type(getattr(self,attr))))
+        if not isinstance( value, type(self.values[attr])):
+            Logger.Fatal("Value {} is of invalid type {}, not {}".format(value, type(value), type(self.values[attr])))
     
-        setattr(self, attr, value)
+        self.values[attr]=value
+
+    def __iter__(self):
+        return iter(self.values)
+
+    def __getitem__(self, key):
+        if not isinstance(key, str):
+            Logger.Fatal("Object {} is not subscriptable with type {}, use {}".format(paramPoint, type(key), str), TypeError)
+        if key in self.values:
+            return self.values[key]
+        else:
+            Logger.Fatal("Object does not have attribute {}".format(key),KeyError)
 
 
 class PriorSet:
@@ -266,6 +273,6 @@ class PriorSet:
         value += self.ice_gradient_joined_prior( these_params["icegrad0"], these_params["icegrad1"] )
         value += self.astro_correlated_prior( these_params["astro1Comp2DNorm"], these_params["astro1Comp2DDeltaGamma"])
 
-
+        return value
 
 
