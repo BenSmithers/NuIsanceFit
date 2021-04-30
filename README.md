@@ -1,47 +1,61 @@
-# SuperFit: The Cascade Successor to GolemFit
+# NuIsanceFit: The Python Successor to GolemFit
 
-The main idea here is to make this easy to follow, and have as few things to hard-code in as possible
+This software fits a set of nuisance parameters (see: [1](https://arxiv.org/abs/1909.01530)) according to a dataset and a set of MC simulation generated according to known parameters.
+It is the spiritual successor to [GolemFit](https://github.com/icecube/GolemFit.)
 
-My main motivation is to improve upon the fit parameter, weighter, prior, and posterior implementation that was in GF.
+<p align="center">
+    <img src="https://user-images.githubusercontent.com/52141176/116719997-4f49d680-a9a1-11eb-9bc9-b550b13ba44f.png" width="350" height="350">
+</p>
+ 
+Motivations: 
+ - Posterior, Fit Parameter, and Priors should be implemented in a refined way such that more can be added in a procedural way. 
+ - Code should be easy to follow
+ - New features should be easy to implement
+ - Stability! Ill-configured parameters should be caught on launch, not after running for a while
+ - Keep configuration separate from implementation. Users should only have to edit the configuration files, not the actual code. 
 
-All of those things are closely linked, and so all of them should be together in the same object. My plan is to define all the parameters in a json file; this json file will be loaded in, the parameter objects buit, and a dictionary-like container of parameters will be made (name->object).
-
-That dictionary-like object will be used and shared by the weighters 
+Ultimately this should be as easy to use as possible! 
 
 ## What it does
 
-Parametrize nuisance parameters. Fit a given flux (data or MC) to those nuisance parameters. Calculate a likelihood (LLH) for this.
-Calculate the LLHs for multiple different fluxes.
+Parametrize nuisance parameters. 
+Find the suite of nuisance parameters, that reweight simulation data, maximizing the likelihood of measuring some flux given that reweighted sim data. 
+Calculate a likelihood (LLH) for this set of nuisance parameters according to their prior distributions and the difference between the simulation expectation and flux measurement. 
+Calculate the LLHs for multiple different fluxes (different physics?)
 Find the most likely one 
-
-The likelihood calculation is really tricky though. So to do this, we need known MC and unknown data. The nuisance parameters are used to reweigh the MC. Then we ask 'what is the likelihood we get this data given this flux prediction (MC)?' 
-So we move the nuisance parameters around until we can minimize that likelihood 
 
 # Contributing:
 
-I'll eventually try to set up a list of issues on a workboard that people can volunteer to do.
+Check out the workboard in the Projects tab! As I do more work here, I'll keep adding more projects there. 
 
-Some major style guidelines 
- - every function and class should have a docstring that explains what the thing does
+Major style guidelines 
+ - functions and classes should have a docstring that explains what the thing does
  - If you have a choice between clear (but verbose) and concise (but obtuse), choose clear
  - No tabs; use four spaces
  - Nothing should be hard-coded. Use configuration files
- - Use descriptive names for variables. If the function of a variable is not immediately obvious fro
+ - Use descriptive names for variables. If the function of a variable is not immediately obvious, you should probably rename it. 
 
 And other major rules
  - raise exceptions at unexpected situations. The exception message should provide enough detail to debug 
  - always check inputs in functions. Use `isinstance` and not `type(...)==[...]` 
  - Always test your code before committing 
- - Do **not** import anything into the global namespace. No `from numpy import *` allowed. 
+ - Do **not** import anything into the global namespace. No `from numpy import *` allowed. This is a pain for debugging, especially when there's overlap 
 
 ## Some other suggestions
 
+### Methods/Functions
+
+Type-check inputs to methods and functions. 
+Throw exceptions if an unexpected datatype is received. 
+
+Also check against non-physical values. 
+
 ### Classes 
 
-Be careful that class attributes are only modified when they are expected to. 
- - For internal use, use names like `self._value` 
+Be careful that class attributes are only modified when they are expected to. This can make for some hard to track down bugs!
  - Use getters and setters. For the getters use property decorators, ie 
 ```
+@property
 def value(self):
     return self._value
 ```
@@ -54,6 +68,11 @@ def set_value(self, value):
 ```
 so things don't get set to an unexpected value. This ensures we run into the problem exactly when it's relevant! 
 
+Also, use inheritance when appropriate (see: `weighter.py`) 
+
 ### Dependencies
 
-Try to avoid using bloated uncommon dependencies except where necessary. Numpy, scipy, and matplotlib should have everything we'll need! 
+Try to avoid using bloated uncommon dependencies except where necessary. Numpy, scipy, pytorch and matplotlib should have everything we'll need! If there are other dependencies not present in a standard python installation, add them below. 
+
+Other dependencies:
+ - Add them here 
