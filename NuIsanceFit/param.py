@@ -20,7 +20,7 @@ class Prior:
     def __call__(self):
         Logger.Fatal("Need to use derived class", NotImplementedError)
 
-def UniformPrior(Prior):
+class UniformPrior(Prior):
     """
     A prior which gives uniform probability for the parameter to be anywhere in a fixed range. 
     """
@@ -38,7 +38,7 @@ def UniformPrior(Prior):
         else:
             return 0.0
 
-def GaussianPrior(Prior):
+class GaussianPrior(Prior):
     """
     A prior which uses a Gaussian distribution for the prior 
     """
@@ -49,7 +49,7 @@ def GaussianPrior(Prior):
             Logger.Fatal("stddev should be {}, got {}".format(flota, type(stddev)), TypeError)
 
         self.mean = mean
-        self.stddev = stdev
+        self.stddev = stddev
         self.norm = over_root_two_pi/stddev
         
     def __call__(self, x):
@@ -58,7 +58,7 @@ def GaussianPrior(Prior):
         z = (x-mean)/stddev 
         return log(norm)-(z*z)/2 
 
-def LimitedGaussianPrior(Prior):
+class LimitedGaussianPrior(Prior):
     def __init__(self, mean, stddev, minval, maxval):
         # these two will enforce type-ing! 
         self.limits = UniformPrior(minval, maxval)
@@ -105,7 +105,7 @@ def Gaussian2DPrior(Prior):
                 z1 = (x1-self.mean1)/self.stddev1
                 return(self.lnorm + self.prefactor*(z0*z0 + z1*z1 - 2.0*self.correlation*z0*z1))
     
-def LimitedGaussian2DPrior(Prior):
+class LimitedGaussian2DPrior(Prior):
     def __init__(self, mean0, mean1, stddev0, stddev1, correlation, min0, max0, min1,max1):
         self.limits0  = UniformPrior(min0,max0)
         self.limits1  = UniformPrior(min1,max1)
@@ -170,9 +170,9 @@ class Param:
         self._value = self._center
 
         if not (np.isinf(self.min) or np.isinf(self.max)):
-            self.prior = GaussianPrior(self.mean, self.width)
+            self.prior = GaussianPrior(self.center, self.width)
         else:
-            self.prior = LimitedGaussianPrior(self.mean, self.width, self.min, self.max)
+            self.prior = LimitedGaussianPrior(self.center, self.width, self.min, self.max)
 
     @property 
     def center(self):
@@ -256,11 +256,11 @@ class PriorSet:
     def __init__(self):
         self.astro_cor = 0.70
         self.icegrad_cor = 5.091035738186185100e-02
-        self.ice_gradient_joined_prior = Gaussian2DPrior(params["icegrad0"].center, params["icegrad1"].center,\ 
-                                                         params["icegrad0"].width, params["icegrad1"].center,\
+        self.ice_gradient_joined_prior = Gaussian2DPrior(params["icegrad0"].center, params["icegrad1"].center, 
+                                                         params["icegrad0"].width, params["icegrad1"].center,
                                                          self.icegrad_cor)
-        self.astro_correlated_prior    = Gaussian2DPrior(params["astro1Comp2DNorm"].center, params["astro1Comp2DDeltaGamma"].center,\
-                                                         params["astro1Comp2DNorm"].width,  params["astro1Comp2DDeltaGamma"].width, \
+        self.astro_correlated_prior    = Gaussian2DPrior(params["astro1Comp2DNorm"].center, params["astro1Comp2DDeltaGamma"].center,
+                                                         params["astro1Comp2DNorm"].width,  params["astro1Comp2DDeltaGamma"].width, 
                                                          self.astro_cor)
 
     def __call__(self, these_params):
