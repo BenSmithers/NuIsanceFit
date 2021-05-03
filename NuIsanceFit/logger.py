@@ -56,9 +56,11 @@ class LoggerClass:
         self.file = open(logfile,mode='wt', buffering=1)
         self.level = level
         self.visual = visual
+        
+        self.pipe = None
         self.Trace("Initializing Logger")
 
-        self.pipe = None
+
 
     def connect(self, target):
         """

@@ -2,6 +2,22 @@ from .logger import Logger
 from .event import Event 
 
 import numpy as np
+from math import log10
+
+def sci(number, precision=4):
+    """
+    Returns a string representing the number in scientific notation
+    """
+    if not isinstance(number, (int, float)):
+        raise TypeError("Expected {}, not {}".format(float, type(number)))
+    if not isinstance(precision,int):
+        raise TypeError("Precision must be {}, not {}".format(int, type(precision)))
+    try:
+        power = int(log10(abs(number)))
+    except ValueError:
+        return("0.0")
+
+    return("{0:.{1}f}".format(number/(10**power), precision)+"e{}".format( power))
 
 class eventBin:
     def __init__(self):

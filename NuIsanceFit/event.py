@@ -1,6 +1,8 @@
 import enum
-from logger import Logger
+from .logger import Logger
 from numbers import Number 
+
+from math import pi
 
 """
 Here, we describe the Event classes and methods for interacting with the events 
@@ -8,7 +10,7 @@ Here, we describe the Event classes and methods for interacting with the events
 
 class EventCache:
     """
-    This object is used to cache various properties for the Event class 
+    This object is used to cache various properties used during the Weighting 
     """
     def __init__(self):
         # quantities
@@ -42,8 +44,18 @@ class EventCache:
 
 
 class Event:
+    """
+    This defines 'events' in the detector and all the possible parameters it can have. These are really the fundamental 
+    object type that is used in the weighting and likelihood calculation. 
 
+    We bin these in the histograms (well, in the histograms' eventBins)  - see histogram.py
+    """
     def __init__(self):
+        """
+        Initializes a null event. Decided against putting all these parameters in the constructor, seems like bad form to have a dozen arguments here .
+
+        Considering later adding a **kwargs and parsing those individually. (check for name, pass to setBLAH function)
+        """
         self._primaryEnergy = 0.0
         self._primaryAzimuth = 0.0
         self._primaryZenith = 0.0
@@ -53,14 +65,15 @@ class Event:
 
         self._oneWeight = 0.0
 
-        self._num_events = 0
+        self._num_events = 1
 
         self._energy = 0.0
         self._zenith = 0.0
         self._azimuth = 0.0
 
         self._sample = 0 # SampleTag.CASCADE
-        
+       
+        # 0 is track, 1 is cascade
         self._topology = 0
 
         self._year = 0
@@ -71,7 +84,7 @@ class Event:
     """
     Check that the object's type is right, and then check that it's a physical value. 
 
-    All of these work the same exact way
+    All of these work the same exact way, and just set some parameter. 
     """
     def setPrimaryEnergy(self, energy):
         if not isinstance(energy, Number):
@@ -106,7 +119,7 @@ class Event:
     def setIntY(self, intY):
         if not isinstance(intY, Number):
             Logger.Fatal("Bjorken Y should be a number, not {}".format(type(intY)))
-        if intX<0:
+        if intY<0:
             Logger.Fatal("Cannot have negative Bjorken Y {}".format(intY))
         self._intY = intY
     def setOneWeight(self, oneWeight):
@@ -151,8 +164,8 @@ class Event:
         if year<0:
             Logger.Fatal("Cannot have negative year {}".format(year))
         self._year = year
-
-
+    # =================== The Getters
+    # they get parameters. 
     @property
     def primaryEnergy(self):
         return self._primaryEnergy

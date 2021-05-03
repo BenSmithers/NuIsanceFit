@@ -1,25 +1,40 @@
 {
     "binning":{
         "energy":{
-            "min":4.78,
+            "min":5,
             "max":1e7,
-            "binWidth":0.111,
+            "bins":50,
             "log":true
         },
         "cosTh":{
             "min":-1,
             "max":1,
-            "binWidth":0.2,
+            "bins":30,
             "log":false
         },
         "azimuth":{
             "min":0.0,
             "max":6.283185,
-            "binWidth":6.283185,
+            "bins":1,
             "log":false
         },
         "year":{
-
+            "min":-1,
+            "max":3000,
+            "bins":1,
+            "log":false 
         }
+    },
+    "datadir":"/home/benito/software/golem_fit/sources/GolemFit/monte_carlo/HESE/",
+    "simToLoad":"nue_dom_081.h5",
+    "dataToLoad":"Ares_IC86.AVG_1.27_lite_golden_50000.h5",
+    "mctype":"LeptonWeighter",
+    "livetimes":{
+        "0":331.0,
+        "1":331.0,
+        "2":326.385,
+        "3":358.4,
+        "4":368.308,
+        "5":362.525
     }
 }
