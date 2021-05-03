@@ -1,5 +1,5 @@
-from logger import Logger
-from event import Event 
+from .logger import Logger
+from .event import Event 
 
 import numpy as np
 
@@ -47,7 +47,7 @@ def build_arbitrary_list(dims, dtype):
     if len(dims)==1:
         return [dtype() for i in range(dims[0])]
     else:
-        return [ _get_entry(dims[1:]) for i in range(dims[0]) ]
+        return [ build_arbitrary_list(dims[1:], dtype) for i in range(dims[0]) ]
 
 def itemset(source, amount, binloc):
     """
@@ -56,7 +56,7 @@ def itemset(source, amount, binloc):
     if len(binloc)==1:
         source[binloc[0]] = amount
     else:
-        itemset(source, amount, binloc[:1])
+        itemset(source[binloc[0]], amount, binloc[1:])
 
 def itemadd(source,amount, binloc):
     """
@@ -65,7 +65,7 @@ def itemadd(source,amount, binloc):
     if len(binloc)==1:
         source[binloc[0]]+=amount
     else:
-        itemadd(source,amount, binloc[:1])
+        itemadd(source[binloc[0]], amount, binloc[1:])
 
 def itemget(source, binloc):
     """
@@ -74,7 +74,7 @@ def itemget(source, binloc):
     if len(binloc)==1:
         return source[binloc[0]]
     else:
-        return itemget(source, binloc[:1])
+        return itemget(source[binloc[0]], binloc[1:])
 
 def get_loc(x, domain):
     """
@@ -145,7 +145,7 @@ class bhist:
             if len(entry)<2:
                 raise ValueError("Entries in 'edges' must be at least length 2, got {}".format(len(entry)))
 
-        self._edges = np.sort(edges) # make sure the edges are all sorted 
+        self._edges = [np.sort(edge) for edge in edges] # make sure the edges are all sorted 
         self._dtype = dtype 
 
         # Ostensibly you can bin strings... not sure why you would, but you could  
@@ -170,7 +170,7 @@ class bhist:
         """
         if not len(args)==len(self._edges):
             raise ValueError("Wrong number of args to register! Got {}, not {}".format(len(args), len(self._edges)))
-        if not isinstance(amt, self._dtype):
+        if False:# not isinstance(amt, self._dtype):
             try:
                 amount = self._dtype(amt)
             except TypeError:
@@ -180,12 +180,13 @@ class bhist:
         
         # note: get_loc returns the indices of the edges that border this point. So we grab the left-edge; the bin number
         bin_loc = tuple([get_loc( args[i], self._edges[i])[0] for i in range(len(args))]) # get the bin for each dimension
+        Logger.Trace("Binning at {}".format(bin_loc))
 
         # Verifies that nothing in the list is None-type
         if all([x is not None for x in bin_loc]):
             # itemset works like ( *bins, amount )
             itemadd(self._fill, amount, bin_loc)
-
+            
             return tuple(bin_loc)
 
     def __getitem__(self, index):
