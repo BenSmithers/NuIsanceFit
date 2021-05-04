@@ -1,8 +1,9 @@
 from threading import Thread
-
-import numpy as np
-from logger import Logger 
 import time
+import numpy as np
+
+from .logger import Logger 
+
 
 # these are global return intermediates
 # we save the function returns here before actually putting them in the _return_vals array 
@@ -20,20 +21,21 @@ def ThreadManager( function, datalist):
 
     We needed to be super careful about race conditions, and so I need to keep totally separate places in memory for these different intermediate return values.
     Python doens't like it when two threads access the samething. So, I needed to hard-code some of this. 
+
+    Now you could make the threads in a procedural way without repeating code. That's doable! But the part where you rejoin the threads _would_ need to be hard-coded. 
     """
-    print("made one")
     if not hasattr(function, "__call__"):
         Logger.Fatal("Expected callable function.", TypeError)
     if not isinstance(datalist, (list, tuple, np.ndarray)):
         Logger.Fatal("Expected list-like, got {}".format(type(datalist)))
-    if not isinstance(dtype, type):
-        Logger.Fatal("`dtype` should be a type definition, got {}".format(type(dtype)))
+    #if not isinstance(dtype, type):
+    #    Logger.Fatal("`dtype` should be a type definition, got {}".format(type(dtype)))
 
-    Logger.Thread("Calling Thread Manager")
+    Logger.Trace("Calling Thread Manager")
     
     _jobs = list(datalist)
     _function = function
-    _dtype = dtype
+    #_dtype = dtype
     
     _done = 0
     _return_vals = [None for i in range(len(datalist))]
@@ -42,7 +44,7 @@ def ThreadManager( function, datalist):
 
     while not all([entry is not None for entry in _return_vals]):
         
-        Logger.Thread("Starting Thread 1")
+        Logger.Trace("Starting Thread 1")
         jobid = len(_jobs)-1
         t1 = Thread( target=metajob, args=(function,_jobs.pop(),jobid, 1, ))
         t1.start()
@@ -52,21 +54,21 @@ def ThreadManager( function, datalist):
         t4_on = False
 
         if len(_jobs)>=1:
-            Logger.Thread("Starting Thread 2")
+            Logger.Trace("Starting Thread 2")
             jobid = len(_jobs)-1
             t2 = Thread( target=metajob, args=(function,_jobs.pop(),jobid, 2, ))
             t2.start()
             t2_on = True
 
         if len(_jobs)>=1:
-            Logger.Thread("Starting Thread 3")
+            Logger.Trace("Starting Thread 3")
             jobid = len(_jobs)-1
             t3 = Thread( target=metajob, args=(function,_jobs.pop(),jobid, 3, ))
             t3.start()
             t3_on = True
         
         if len(_jobs)>=1:
-            Logger.Thread("Starting Thread 4")
+            Logger.Trace("Starting Thread 4")
             jobid = len(_jobs)-1
             t4 = Thread( target=metajob, args=(function,_jobs.pop(),jobid, 4, ))
             t4.start()

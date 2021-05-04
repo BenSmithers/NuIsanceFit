@@ -1,5 +1,5 @@
-from .logger import Logger
-from .event import Event 
+from NuIsanceFit.logger import Logger
+from NuIsanceFit.event import Event 
 
 import numpy as np
 from math import log10
@@ -57,6 +57,9 @@ class eventBin:
 
     def __getitem__(self, index):
         return self._contains[index]
+
+    def __len__(self):
+        return len(self._contains)
 
 def build_arbitrary_list(dims, dtype):
     """
@@ -153,8 +156,33 @@ def get_loc(x, domain, just_left=False):
     else:
         return(lower_bin, upper_bin)
 
+# one note - I'm manually entering in these flatten and transpose arrays, and you might be wondering why I didn't just use numpy arrays.
+# Numpy arrays don't really like having non-numbers inside, and so they had issues with the Event objects
+# so, I had to use lists. And since I'm using lists, we need these special functions 
+def flatten(bhist):
+    """
+    Takes a bhist, or list, and returns the flattened version
+    """
+    if isinstance(bhist, list):
+        target = bhist
+    elif isinstance(bhist, bHist):
+        target = bhist._fill
 
-class bhist:
+    out = []
+    for item in target:
+        if isinstance(item, (list, tuple)):
+            out.extend(flatten(item))
+        else:
+            out.append(item)
+    return out
+
+def transpose(obj):
+    """
+    Takes a 2D array and transposes it 
+    """
+    return list(zip(*obj))
+
+class bHist:
     """
     Binned Histogram type, or Bhist     
 
@@ -227,10 +255,13 @@ class bhist:
     def __iter__(self):
         return iter(self._fill)
 
+    def __len__(self):
+        return len(self._fill)
+
 
     @property
     def dtype(self):
-        return self._dtype
+        return self._datatype
 
     # some access properties. Note these aren't function calls. They are accessed like "object.centers" 
     @property

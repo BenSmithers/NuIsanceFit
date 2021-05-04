@@ -1,7 +1,7 @@
-from Event import Event 
-from param import params as global_params
+from NuIsanceFit.event import Event 
+from NuIsanceFit.param import params as global_params
 
-from logger import Logger 
+from NuIsanceFit.logger import Logger 
 
 """
 Here we design and implement classes to Weight events
@@ -16,8 +16,8 @@ class Weighter:
     Structured such that Weighters can weight things of any type 
     """
     def __init__(self, dtype=float):
-        if not isinstance(dtype, type):
-            Logger.Fatal("Arg 'dtype' must be {}, got {}".format(type, type(dtype)), TypeError) # weird...
+        #if not isinstance(dtype, type):
+        #    Logger.Fatal("Arg 'dtype' must be {}, got {}".format(type, type(dtype)), TypeError) # weird...
 
         self._dtype = dtype
 
@@ -124,7 +124,7 @@ class simpleDataWeighter(Weighter):
     def __init__(self, dtype=float):
         Weighter.__init__(self, dtype)
     def __call__(self, event):
-        return event.cachedWeight.weight
+        return 1. #event.cachedWeight.weight
 
 """
 TODO: 
@@ -169,5 +169,5 @@ class WeighterMaker:
         Logger.Trace("Astro")
         astroComponent          = powerLawTiltWeighter(params["astroNorm"]*1e5, -2.0 + params["astroDeltaGamma"])
 
-        return( concentionalComponent + promptComponent + astroComponent )
+        return( conventionalComponent + promptComponent + astroComponent )
 

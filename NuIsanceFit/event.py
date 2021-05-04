@@ -102,7 +102,7 @@ class Event:
     def setPrimaryZenith(self, zenith):
         if not isinstance(zenith, Number):
             Logger.Fatal("Cannot set zenith to {}".format(type(zenith)))
-        if (zenith<0) or (zenith>pi):
+        if (zenith<-1) or (zenith>1):
             Logger.Fatal("Invalid zenith {}. Is this in degrees? It should be radians!".format(zenith))
         self._primaryZenith =zenith
     def setTotalColumnDepth(self, totalColumnDepth):
@@ -150,7 +150,7 @@ class Event:
     def setZenith(self, zenith):
         if not isinstance(zenith, Number):
             Logger.Fatal("Cannot set zenith to {}".format(type(zenith)))
-        if (zenith<0) or (zenith>pi):
+        if (zenith<-1) or (zenith>1):
             Logger.Fatal("Invalid zenith {}. Is this in degrees? It should be radians!".format(zenith))
         self._zenith =zenith
     def setTopology(self, topology):

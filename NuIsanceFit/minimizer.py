@@ -10,14 +10,15 @@ CPrior
 SAYLikelihood
 """
 
-from param import paramPoint, PriorSet
-from logger import Logger 
-from weighter import Weighter
-from weighter import WeighterMaker as simWeighterMaker
-from histogram import bhist, eventBin
-from nuthread import ThreadManager
-
-from event import Event
+from NuIsanceFit.param import paramPoint, PriorSet
+from NuIsanceFit.logger import Logger 
+from NuIsanceFit.weighter import Weighter
+from NuIsanceFit.weighter import WeighterMaker as simWeighterMaker
+from NuIsanceFit.weighter import simpleDataWeighter 
+from NuIsanceFit.histogram import bHist, eventBin, flatten, transpose
+from NuIsanceFit.nuthread import ThreadManager
+from NuIsanceFit.event import Event
+from NuIsanceFit.data import Data
 
 from math import log, lgamma, log1p
 #lgamma - log of gamma function
@@ -83,55 +84,20 @@ for minLLH
 The do fit thing uses our overall likelihood problem and the LBFGSB_Driver minimizer
 """
 _event_type = Event
-_hist_type = bhist
+_hist_type = bHist
 _bin_type = eventBin
-#  energy, cos(zenith), azimuth, year 
-_array_dims = 4
-def _verify_array_shape(array):
-    """
-    This function makes sure that whatever we're sending in as our simulation or observation is all formatted correctly.
-    This ensures we know the exact kinda data we're working with 
-    """
-    if not isinstance(array, _hist_type):
-        Logger.Warn("Incorrect Histogram Type: {}".format(type_arry))
-        return False
-
-    shape = np.shape(array)
-    if len(shape)!=_array_dims:
-        Logger.Warn("Incorrect shape: {}".format(shape))
-        return False
-
-    # Guaranteed 5-d array
-    # each bin needs to hold bins
-    if array.dtype!=_bin_type:
-        Logger.Warn("Incorrect bin type: {}".format(array.dtype))
-        return False
-
-    # the bins should be iterable... 
-    for entry in array.flat:
-        if not isinstance(entry, _bin_type):
-            Logger.Warn("This should be unreachable... since this should've already been found! ")
-            return False
-        if entry.dtype!=_event_type:
-            Logger.Warn("Bin Event type should be {}, found {}".format(_event_type, entry.dtype))
-            return False
-
-    return True
 
 class llhMachine:
-    def __init__(self):
+    def __init__(self, data_obj):
         """
         Machine for calculating the likelihood of an observation, given simulation, for a set of parameters  
         """
         self._minimum = None # only non-None type when minimized 
    
         self._prior = PriorSet()
-        self._includePriors
+        self._includePriors = True
 
-        self._obshist = None
-        self._simhist = None 
-
-        self._dataWeighter = None
+        self._dataWeighter = simpleDataWeighter()
         self._simWeighter = None
 
         self._weighttype = float
@@ -148,40 +114,35 @@ class llhMachine:
         self._llhdtype = float
         self.setLikelihoodFunc( SAYLikelihood )
 
+        self._configure_with_data(data_obj)
+
     # ========================== Getters and Setters ===============================
+    def _configure_with_data(self, data_obj):
+        if not isinstance(data_obj, Data):
+            Logger.Fatal("Can only pass {} as data obj, not {}".format(Data, type(data_obj)))
+
+        self._observation = data_obj.data
+        self._simulation = data_obj.simulation
+
     @property
     def prior(self):
         return self._prior
-
-
-    # OG GolemFit uses a 5-dimensional array of bins. Bins contained events. So let's do that too
-    def setSimulation(self, simulation):
-        if not _verify_array_shape(simulation):
-            Logger.Fatal("Cannot configure with this simulation histogram.")
-        else:
-            self._simulation = simulation
     @property 
     def simulation(self):
         return self._simulation
-
-    def setObservation(self, observation):
-        if not _verify_array_shape(observation):
-            Logger.Fatal("Cannot configure with this observation histogram")
-        else:
-            self._observation = observation
     @property
     def observation(self):
         return self._observation 
 
 
-    def setSimWeighterMaker(self, weighter):
-        pass
+    def setSimWeighterMaker(self, weighterMaker):
+        self._simWeighterMaker = weighterMaker()
     @property
     def simWeighterMaker(self):
         return self._simWeighterMaker
 
     def setDataWeighterMaker(self, weighter):
-        pass 
+        self._dataWeighterMaker = weighter
     @property
     def dataWeighterMaker(self):
         return self._dataWeighterMaker
@@ -197,8 +158,8 @@ class llhMachine:
 
 
     def _validate(self):
-        if not isinstance(self._simweighter, Weighter):
-            Logger.Fatal("SimWeighter should be {}, not {}".format(Weighter, type(self._simweighter)), TypeError)
+        if not isinstance(self._simWeighter, Weighter):
+            Logger.Fatal("SimWeighter should be {}, not {}".format(Weighter, type(self._simWeighter)), TypeError)
         
         #TODO  need to validate the other things!
 
@@ -212,24 +173,28 @@ class llhMachine:
         """
         llh = self._llhdtype(0.0)
 
-        for entry in pairs:
-            if len(entry)!=2:
-                Logger.Fatal("Found unexpected length for sim/obs pair, {}".format(len(entry)), ValueError)
+        assert(len(pairs)==2)
+        obs = pairs[0]
+        sim = pairs[1]
+        assert(len(obs)==len(sim))
+
+        for i in range(len(obs)):
             # these are bin objects, they have events 
-            this_obs = entry[0] 
-            this_sim = entry[1]
+            this_obs = obs[i] 
+            this_sim = sim[i]
 
             # get total weight of events oveserved in this bin
             observationAmount = sum([self._dataWeighter(event) for event in this_obs])
+            Logger.Trace("Measured {}".format(observationAmount))
 
             # get the expectation here 
-            expectationWeights = [self._weightType() for event in this_sim]
-            expectationSqWeights = [self._weightType() for event in this_sim]
+            expectationWeights = [self._weighttype() for event in this_sim]
+            expectationSqWeights = [self._weighttype() for event in this_sim]
 
             n_events = 0
-            for i_event in range(len(his_sim)):
+            for i_event in range(len(this_sim)):
                 event = this_sim[i_event]
-                w = self.simWeighter(event)
+                w = self._simWeighter(event)
                 assert(w>=0)
                 w2 = w*w
                 assert(w2>=0)
@@ -256,8 +221,8 @@ class llhMachine:
         Here, we take our binned histograms. We separate them along the first axis, flatten along the other four axes. 
         Then we use the core function 
         """
-        Logger.Thread("Making sim/data Weighters")
-        self._dataWeighter = self.dataWeighterMaker(params)
+        Logger.Trace("Making sim/data Weighters")
+        self._dataWeighter = simpleDataWeighter
         self._simWeighter = self.simWeighterMaker(params)
  
         # If this is outside our valid parameter space, BAIL OUT
@@ -273,12 +238,14 @@ class llhMachine:
         llh = prior_param if self._includePriors else self._llhdtype(0.0)
 
         # this is a deterministic process, so the bin ordering shouldn't be affected 
-        flat_obs = np.array([axis0.flatten() for axis0 in self.observation])
-        flat_sim = np.array([axis0.flatten() for axis0 in self.simulation])
+        flat_obs = [flatten(axis0) for axis0 in self.observation]
+        flat_sim = [flatten(axis0) for axis0 in self.simulation]
+        pairs = [[flat_obs[i], flat_sim[i]] for i in range(len(flat_obs))]
+        Logger.Trace("Flattened to {} shape".format(np.shape(flat_obs)))
        
-        Logger.Thread("Starting up Threader for LLH calculation")
+        Logger.Trace("Starting up Threader for LLH calculation")
         # now prepare these into pairs of stacks for the threading     
-        llh += ThreadManager( self._likelihoodCore, np.transpose([flat_obs, flat_sim]))
+        llh += ThreadManager( self._likelihoodCore, pairs)
         
         return(llh)
 
@@ -299,4 +266,4 @@ class llhMachine:
         if not isinstance(params, paramPoint):
             Logger.Fatal("Cannot evaluate LLH for object of type {}".format(type(params)), TypeError)
 
-    
+        self._evaluateLikelihood(params) 

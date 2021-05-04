@@ -1,10 +1,9 @@
 import numpy as np
 import os, json
 from numbers import Number # parent of all numbers 
-
 from math import sqrt, pi, log
 
-from logger import Logger
+from NuIsanceFit.logger import Logger
 
 over_root_two_pi = 1./sqrt(2*pi)
 
@@ -46,7 +45,7 @@ class GaussianPrior(Prior):
         if not isinstance(mean, Number):
             Logger.Fatal("mean should be {}, got {}".format(float, type(mean)), TypeError)
         if not isinstance(stddev, Number):
-            Logger.Fatal("stddev should be {}, got {}".format(flota, type(stddev)), TypeError)
+            Logger.Fatal("stddev should be {}, got {}".format(float, type(stddev)), TypeError)
 
         self.mean = mean
         self.stddev = stddev
@@ -55,8 +54,8 @@ class GaussianPrior(Prior):
     def __call__(self, x):
         if self.norm==0.0:
             return(0.0)
-        z = (x-mean)/stddev 
-        return log(norm)-(z*z)/2 
+        z = (x-self.mean)/self.stddev 
+        return log(self.norm)-(z*z)/2 
 
 class LimitedGaussianPrior(Prior):
     def __init__(self, mean, stddev, minval, maxval):
@@ -68,7 +67,7 @@ class LimitedGaussianPrior(Prior):
         return self.limits(x) + self.prior(x)
 
 
-def Gaussian2DPrior(Prior):
+class Gaussian2DPrior(Prior):
     """
     A 2D Gaussian prior 
     """
@@ -97,21 +96,21 @@ def Gaussian2DPrior(Prior):
             self.lnorm = log(over_root_two_pi/(self.stddev0*stddev1*sqrt(1.0-self.correlation*self.correlation)))
             self.prefactor = -1.0/(2.0*1.0-correlation*correlation)
 
-        def __call__(x0, x1):
-            if prefactor==0.0:
-                return lnorm
-            else:
-                z0 = (x0-self.mean0)/self.stddev0
-                z1 = (x1-self.mean1)/self.stddev1
-                return(self.lnorm + self.prefactor*(z0*z0 + z1*z1 - 2.0*self.correlation*z0*z1))
+    def __call__(self,x0, x1):
+        if self.prefactor==0.0:
+            return self.lnorm
+        else:
+            z0 = (x0-self.mean0)/self.stddev0
+            z1 = (x1-self.mean1)/self.stddev1
+            return(self.lnorm + self.prefactor*(z0*z0 + z1*z1 - 2.0*self.correlation*z0*z1))
     
 class LimitedGaussian2DPrior(Prior):
     def __init__(self, mean0, mean1, stddev0, stddev1, correlation, min0, max0, min1,max1):
         self.limits0  = UniformPrior(min0,max0)
         self.limits1  = UniformPrior(min1,max1)
-        sefl.prior = Gaussian2DPrior(mean0, mean1, stddev0, stddev1, correlation)
+        self.prior = Gaussian2DPrior(mean0, mean1, stddev0, stddev1, correlation)
 
-    def __call__(x):
+    def __call__(self, x):
         return self.limits0(x) + self.limits1(x) + self.prior(x)
 
 
@@ -191,7 +190,7 @@ class Param:
         return self._max
 
     def __str__(self):
-        return( "{}: center {}; width {}; min {}, max {}. Will {}Fit\n".format(self.name, self.center, self.width, self.min, self.max, "" if self.fit else "not "))
+        return( "Param: center {}; width {}; min {}, max {}. Will {}Fit\n".format( self.center, self.width, self.min, self.max, "" if self._fit else "not "))
 
     def __repr__(self):
         return self.__str__()
@@ -257,7 +256,7 @@ class PriorSet:
         self.astro_cor = 0.70
         self.icegrad_cor = 5.091035738186185100e-02
         self.ice_gradient_joined_prior = Gaussian2DPrior(params["icegrad0"].center, params["icegrad1"].center, 
-                                                         params["icegrad0"].width, params["icegrad1"].center,
+                                                         params["icegrad0"].width, params["icegrad1"].width,
                                                          self.icegrad_cor)
         self.astro_correlated_prior    = Gaussian2DPrior(params["astro1Comp2DNorm"].center, params["astro1Comp2DDeltaGamma"].center,
                                                          params["astro1Comp2DNorm"].width,  params["astro1Comp2DDeltaGamma"].width, 
@@ -267,7 +266,7 @@ class PriorSet:
         value = 0.0
         # add up contributions from the procedural ones
         for key in params:
-            value += params[param].prior( these_params[param] )
+            value += params[key].prior( these_params[key] )
 
         # add up contributions from the 2D ones 
         value += self.ice_gradient_joined_prior( these_params["icegrad0"], these_params["icegrad1"] )
