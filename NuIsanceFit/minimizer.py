@@ -222,7 +222,7 @@ class llhMachine:
         Then we use the core function 
         """
         Logger.Trace("Making sim/data Weighters")
-        self._dataWeighter = simpleDataWeighter
+        self._dataWeighter = simpleDataWeighter()
         self._simWeighter = self.simWeighterMaker(params)
  
         # If this is outside our valid parameter space, BAIL OUT
@@ -245,7 +245,7 @@ class llhMachine:
        
         Logger.Trace("Starting up Threader for LLH calculation")
         # now prepare these into pairs of stacks for the threading     
-        llh += ThreadManager( self._likelihoodCore, pairs)
+        llh += sum(ThreadManager( self._likelihoodCore, pairs))
         
         return(llh)
 
