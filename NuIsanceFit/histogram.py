@@ -4,6 +4,8 @@ from .event import Event
 import numpy as np
 from math import log10
 
+from collections import deque
+
 def sci(number, precision=4):
     """
     Returns a string representing the number in scientific notation
@@ -21,20 +23,31 @@ def sci(number, precision=4):
 
 class eventBin:
     def __init__(self):
-        self._contains = []
+        self._contains = deque()
+
     def add(self, event):
         if not isinstance(event, Event):
             Logger.Fatal("Cannot bin event of type {}")
-        self._contains += event
-        
-    def __add__(self,event):
+        self._contains.append( event )
+       
+    def __iadd__(self, event):
+        if isinstance(event, Event):
+            self._contains.append(event)
+        elif isinstance(event, eventBin):
+            self._contains.extend( event._contains )
+        else:
+            Logger.Fatal("Cannot perform '+' with {}".format(type(event)))
+
+    def __add__(self, event):
         if isinstance(event, Event):
             new_obj = eventBin()
-            new_obj._contains= self._contains + [event]
+            new_obj._contains = self._contains
+            new_obj._contains.append(event)
             return new_obj
         elif isinstance(event, eventBin):
             new_obj = eventBin()
-            new_obj._contains = self._contains + event._contains
+            new_obj._contains = self._contains
+            new_obj._contains.extend( event._contains )
             return new_obj
         else:
             Logger.Fatal("Cannot perform '+' with {}".format(type(event)))
@@ -79,7 +92,8 @@ def itemadd(source,amount, binloc):
     Adds 'amount' to the entry in source at coordinates -binloc-
     """
     if len(binloc)==1:
-        source[binloc[0]]+=amount
+        assert(isinstance(binloc[0],int))
+        source[binloc[0]] = source[binloc[0]] + amount
     else:
         itemadd(source[binloc[0]], amount, binloc[1:])
 
@@ -92,7 +106,7 @@ def itemget(source, binloc):
     else:
         return itemget(source[binloc[0]], binloc[1:])
 
-def get_loc(x, domain):
+def get_loc(x, domain, just_left=False):
     """
     Returns the indices of the entries in domain that border 'x' 
     Raises exception if x is outside the range of domain 
@@ -110,7 +124,8 @@ def get_loc(x, domain):
         raise ValueError("get_loc function only works on domains of length>1. This is length {}".format(len(domain)))
 
     if x<domain[0] or x>domain[-1]:
-        raise ValueError("x={} and is outside the domain: ({}, {})".format(sci(x), sci(domain[0]), sci(domain[-1])))
+        Logger.Trace("x={} and is outside the domain: ({}, {})".format(sci(x), sci(domain[0]), sci(domain[-1])))
+        return
 
     min_abs = 0
     max_abs = len(domain)-1
@@ -133,19 +148,23 @@ def get_loc(x, domain):
         upper_bin = lower_bin + 1
 
     assert(x>=domain[lower_bin] and x<=domain[upper_bin])
-    return(lower_bin, upper_bin)
+    if just_left:
+        return lower_bin
+    else:
+        return(lower_bin, upper_bin)
 
 
 class bhist:
     """
     Binned Histogram type, or Bhist     
 
-    I made this so I could have a binned histogram that could be used for adding more stuff at arbitrary places according to some "edges" it has. The object would handle figuring out which of its bins would hold the stuff. 
+    I made this so I could have a binned histogram that could be used for adding more stuff at arbitrary places according to some "edges" it has. The object would handle figuring out which of its bins would hold the stuff along an arbitrary number of axes 
 
-    Also made with the potential to store integers, floats, or whatever can be added together and has both an additive rule and some kind of identity element correlated with the default constructor. 
-        If a non-dtype entry is given, it will be explicitly cast to the dtype. 
+    We also have discrete bin and data types. The only requirement is that the bin is that 
+        bin + data 
+    is a valid operation that modifies the bins. Both could be floats, or lists, or whatever. 
     """
-    def __init__(self,edges, dtype=float):
+    def __init__(self,edges, bintype = list, datatype=float):
         """
         Arg 'edges' should be a tuple of length 1 or 2  
 
@@ -162,17 +181,12 @@ class bhist:
                 raise ValueError("Entries in 'edges' must be at least length 2, got {}".format(len(entry)))
 
         self._edges = [np.sort(edge) for edge in edges] # make sure the edges are all sorted 
-        self._dtype = dtype 
-
-        # Ostensibly you can bin strings... not sure why you would, but you could  
-        try:
-            x = dtype() + dtype()
-        except Exception:
-            raise TypeError("It appears impossible to add {} together.".format(dtype))
+        self._bintype = bintype 
+        self._datatype = datatype
 
         # build the function needed to register additions to the histograms.
         dims = tuple([len(self._edges[i])-1 for i in range(len(self._edges))])
-        self._fill = build_arbitrary_list( dims, self._dtype ) 
+        self._fill = build_arbitrary_list( dims, self._bintype ) 
 
 
         self._counter = 0
@@ -186,16 +200,16 @@ class bhist:
         """
         if not len(args)==len(self._edges):
             raise ValueError("Wrong number of args to register! Got {}, not {}".format(len(args), len(self._edges)))
-        if False:# not isinstance(amt, self._dtype):
+        if not isinstance(amt, self._datatype):
             try:
-                amount = self._dtype(amt)
+                amount = self._datatype(amt)
             except TypeError:
-                raise TypeError("Expected {}, got {}. Tried casting to {}, but failed.".format(self._dtype, type(amt), self._dtype))
+                raise TypeError("Expected {}, got {}. Tried casting to {}, but failed.".format(self._datatype, type(amt), self._datatype))
         else:
             amount = amt
         
         # note: get_loc returns the indices of the edges that border this point. So we grab the left-edge; the bin number
-        bin_loc = tuple([get_loc( args[i], self._edges[i])[0] for i in range(len(args))]) # get the bin for each dimension
+        bin_loc = tuple([get_loc( args[i], self._edges[i], True) for i in range(len(args))]) # get the bin for each dimension
         Logger.Trace("Binning at {}".format(bin_loc))
 
         # Verifies that nothing in the list is None-type

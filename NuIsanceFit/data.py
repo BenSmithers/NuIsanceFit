@@ -34,6 +34,7 @@ Data keys:
 from .histogram import bhist, eventBin
 from .event import Event, EventCache
 
+import time
 from numbers import Number
 import numpy as np
 import h5py as h5
@@ -102,8 +103,8 @@ class Data:
         self._timeEdges = make_edges(bins, "year") 
 
         # ENERGY | COSTH | AZIMUTH | TOPOLOGY | TIME
-        self.simulation = bhist([ self._Eedges, self._cosThEdges, self._azimuthEdges, self._topoEdges, self._timeEdges ], dtype=eventBin)
-        self.data = bhist([ self._Eedges, self._cosThEdges, self._azimuthEdges, self._topoEdges, self._timeEdges ], dtype=eventBin)
+        self.simulation = bhist([ self._Eedges, self._cosThEdges, self._azimuthEdges, self._topoEdges, self._timeEdges ], bintype=eventBin,datatype=Event)
+        self.data = bhist([ self._Eedges, self._cosThEdges, self._azimuthEdges, self._topoEdges, self._timeEdges ], bintype=eventBin,datatype=Event)
    
         self.loadMC()
 
@@ -118,25 +119,34 @@ class Data:
             Logger.Log("Opening {}".format(entry))
             data = h5.File(entry, 'r')
             i_event = 0
+
+            # we want to read in the whole dataset! 
+            _e_reco = data["energy_reco"][:]
+            _z_reco = data["zenith_reco"][:]
+            _a_reco = data["azimuth_reco"][:]
+            _is_cascade = data["is_cascade"][:]
+            _primary = data["MCPrimary"][:]
+            _weight = data["I3MCWeightDict"][:]
+                
             while i_event<len(data["is_track"]):
                 new_event = Event()
                 # note: the first four entries are for 
                 #        Run, Event, SubEvent, SubEventStream, and Existance 
-                new_event.setEnergy(  data["energy_reco"][i_event][5] )
-                new_event.setZenith(  data["zenith_reco"][i_event][5] )
-                new_event.setAzimuth(data["azimuth_reco"][i_event][5] )
-                new_event.setTopology(int(data["is_cascade"][i_event][5]) )
+                new_event.setEnergy(  _e_reco[i_event][5] )
+                new_event.setZenith(  _z_reco[i_event][5] )
+                new_event.setAzimuth( _a_reco[i_event][5] )
+                new_event.setTopology(int(_is_cascade[i_event][5]) )
                 new_event.setYear( 0 ) #TODO change this when you want to bin in time 
                 
-                new_event.setPrimaryEnergy(  data["MCPrimary"][i_event][11] )
-                new_event.setPrimaryAzimuth( data["MCPrimary"][i_event][10] )
-                new_event.setPrimaryZenith(  data["MCPrimary"][i_event][9] )
-                new_event.setPrimaryAzimuth( data["MCPrimary"][i_event][10] )
+                new_event.setPrimaryEnergy(  _primary[i_event][11] )
+                new_event.setPrimaryAzimuth( _primary[i_event][10] )
+                new_event.setPrimaryZenith(  _primary[i_event][9] )
+                new_event.setPrimaryAzimuth( _primary[i_event][10] )
                 
-                new_event.setOneWeight( data["I3MCWeightDict"][i_event][30] )
+                new_event.setOneWeight(_weight[i_event][30] )
                 #new_event.setIntX( data["I3MCWeightDict"][i_event][5] )
                 #new_event.setIntY( data["I3MCWeightDict"][i_event][6] )
-
+            
                 self.simulation.add(new_event, new_event.energy, cos(new_event.zenith), new_event.azimuth, new_event.topology, new_event.year)
 
                 if i_event%10000==0:

@@ -2,6 +2,7 @@ import enum
 from .logger import Logger
 from numbers import Number 
 
+import numpy as np
 from math import pi
 
 """
@@ -214,9 +215,7 @@ class Event:
         return self._cachedweight.convWeight + self._cachedweight.promptWeight + self._cachedweight.astroMuWeight
 
     def __add__(self, other):
-        meta_weight = self._get_meta_weight
-        if np.isnan(meta_weight) or meta_weight<0:
-            Logger.Fatal("Found invalid metaweight! {}".format(meta_weight))
+        raise NotImplementedError()
     def __eq__(self, other):
         raise NotImplementedError()
     def __mul__(self, other):
