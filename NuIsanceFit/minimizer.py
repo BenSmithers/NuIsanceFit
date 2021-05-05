@@ -185,7 +185,6 @@ class llhMachine:
 
             # get total weight of events oveserved in this bin
             observationAmount = sum([self._dataWeighter(event) for event in this_obs])
-            Logger.Trace("Measured {}".format(observationAmount))
 
             # get the expectation here 
             expectationWeights = [self._weighttype() for event in this_sim]
@@ -202,8 +201,10 @@ class llhMachine:
                 expectationWeights[i_event] = w
                 expectationSqWeights[i_event] = w2
 
-                if np.isnan(w):
+                if np.isnan(w) or np.isinf(w):
                     Logger.Warn("Bad Weight {} for Event {}".format(w, event))
+                if np.isnan(w) or np.isinf(w):
+                    Logger.Warn("Bad WeightSq {} for Event {}".format(w, event))
                 if np.isnan(event.num_events):
                     Logger.Warn("Bad num_events {} for Event {}".format(event.num_events, event))
 
@@ -211,8 +212,11 @@ class llhMachine:
             # this should work on anything with a defined "+" operation 
             w_sum = np.sum(expectationWeights)
             w2_sum = np.sum(expectationSqWeights)
+            this_llh = self.likelihoodFunc(observationAmount, w_sum, w2_sum, self._llhdtype)
+            if np.isnan(this_llh) or np.isinf(this_llh):
+                Logger.Warn("Bad llh {} found! From obs {}, {} w_sum, {} w_2".format(this_llh, observationAmount, w_sum, w2_sum))
 
-            llh += self.likelihoodFunc(observationAmount, w_sum, w2_sum, self._llhdtype)
+            llh += this_llh
         
         return llh
 
@@ -228,6 +232,7 @@ class llhMachine:
         # If this is outside our valid parameter space, BAIL OUT
         prior_param = self.prior(params)
         if np.isnan(prior_param):
+            Logger.Warn("nan Prior!")
             return(-np.inf) 
 
         # we flatten these out into big stacks of bins 
@@ -241,7 +246,6 @@ class llhMachine:
         flat_obs = [flatten(axis0) for axis0 in self.observation]
         flat_sim = [flatten(axis0) for axis0 in self.simulation]
         pairs = [[flat_obs[i], flat_sim[i]] for i in range(len(flat_obs))]
-        Logger.Trace("Flattened to {} shape".format(np.shape(flat_obs)))
        
         Logger.Trace("Starting up Threader for LLH calculation")
         # now prepare these into pairs of stacks for the threading     
@@ -266,4 +270,4 @@ class llhMachine:
         if not isinstance(params, paramPoint):
             Logger.Fatal("Cannot evaluate LLH for object of type {}".format(type(params)), TypeError)
 
-        self._evaluateLikelihood(params) 
+        return self._evaluateLikelihood(params) 
