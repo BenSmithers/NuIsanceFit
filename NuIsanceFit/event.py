@@ -57,9 +57,12 @@ class Event:
 
         Considering later adding a **kwargs and parsing those individually. (check for name, pass to setBLAH function)
         """
+        self.is_mc = False
+
         self._primaryEnergy = 0.0
         self._primaryAzimuth = 0.0
         self._primaryZenith = 0.0
+        self._primaryType = 0
         self._totalColumnDepth = 0.0
         self._intX = 0
         self._intY = 0
@@ -87,10 +90,15 @@ class Event:
 
     All of these work the same exact way, and just set some parameter. 
     """
+    def setPrimaryType(self, which):
+        if not isinstance(which, int):
+            Logger.Fatal("Particle ID uses PDG ID, must be {}, not {}".format(int, type(which)))
+        self._primaryType = which 
+
     def setPrimaryEnergy(self, energy):
         if not isinstance(energy, Number):
             Logger.Fatal("Cannot set energy to {}".format(type(energy)))
-        if energy<0:
+        if energy<=0:
             Logger.Fatal("Cannot set negative energy {}".format(energy))
         self._primaryEnergy = energy
     def setPrimaryAzimuth(self, azimuth):
@@ -138,7 +146,7 @@ class Event:
     def setEnergy(self, energy):
         if not isinstance(energy, Number):
             Logger.Fatal("Cannot set energy to {}".format(type(energy)))
-        if energy<0:
+        if energy<=0:
             Logger.Fatal("Cannot set negative energy {}".format(energy))
         self._energy = energy
     def setAzimuth(self, azimuth):
@@ -167,6 +175,9 @@ class Event:
         self._year = year
     # =================== The Getters
     # they get parameters. 
+    @property
+    def primaryType(self):
+        return self._primaryType
     @property
     def primaryEnergy(self):
         return self._primaryEnergy
