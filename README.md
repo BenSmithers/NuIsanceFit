@@ -75,4 +75,7 @@ Also, use inheritance when appropriate (see: `weighter.py`)
 Try to avoid using bloated uncommon dependencies except where necessary. Numpy, scipy, pytorch and matplotlib should have everything we'll need! If there are other dependencies not present in a standard python installation, add them below. 
 
 Other dependencies:
- - Add them here 
+ - Photospline 
+ - NuFATE. With nuFATE though, you might have to editthe Makefile to make it install. I changed the H5DIR line to point towards my HDF5 installation. I also had to change the `-lboost_python` part to point towards the correct version of python I have installed, changing it to `lboost_python38`. I _also_ had to change every call to python for a call for python3.8. 
+
+Wow, okay, so the whole linker situation is absolutely trash with NuFATE. Godspeed trying to get this thing to work. It took me a while
