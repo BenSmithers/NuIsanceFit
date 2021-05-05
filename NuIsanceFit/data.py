@@ -146,18 +146,22 @@ class Data:
             new_event.setAzimuth( _a_reco[i_event][5] )
             new_event.setTopology(int(_is_cascade[i_event][5]) )
             new_event.setYear( 0 ) #TODO change this when you want to bin in time 
-            
-            new_event.setPrimaryEnergy(  _primary[i_event][11] )
-            new_event.setPrimaryAzimuth( _primary[i_event][10] )
-            new_event.setPrimaryZenith( cos(_primary[i_event][9]) )
 
             if is_mc:
-                new_event.setOneWeight(_weight[i_event][30] )
+                new_event.is_mc = True
+                #new_event.setPrimaryEnergy(  _primary[i_event][11] )
+                #new_event.setPrimaryAzimuth( _primary[i_event][10] )
+                #new_event.setPrimaryZenith( cos(_primary[i_event][9]) )
+                new_event.setPrimaryEnergy(  _weight[i_event][33] )
+                new_event.setPrimaryAzimuth( _weight[i_event][32] )
+                new_event.setPrimaryZenith( cos(_weight[i_event][35]) )
+
+                new_event.setOneWeight(_weight[i_event][29] )
             # I was finding negative Bjorkens while loading in data. Need to investiagate what's up with that...
             #new_event.setIntX( data["I3MCWeightDict"][i_event][5] )
             #new_event.setIntY( data["I3MCWeightDict"][i_event][6] )
         
-            target_hist.add(new_event, new_event.energy, cos(new_event.zenith), new_event.azimuth, new_event.topology, new_event.year)
+            target_hist.add(new_event, new_event.energy, new_event.zenith) new_event.azimuth, new_event.topology, new_event.year)
 
             if i_event%100000==0:
                 Logger.Log("Loaded {} Events so far".format(i_event))
