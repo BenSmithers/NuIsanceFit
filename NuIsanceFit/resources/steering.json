@@ -38,8 +38,9 @@
         "5":362.525
     },
     "resources":{
-        "resource_dir":"",
+        "resource_dir":"/home/benito/software/golem_fit/sources/GolemFit/resources",
         "atmospheric_density_spline":"AtmosphericZenithVariationSplines/atm_density_1s.fits",
-        "atmospheric_kaonlosses_spline":"AtmosphericKaonLossesSplines/kaon_loses_1s.fits"
+        "atmospheric_kaonlosses_spline":"AtmosphericKaonLossesSplines/kaon_loses_1s.fits",
+        "attenuation_splines":"AttenuationSplines/STERILE"
     }
 }
