@@ -23,6 +23,9 @@ class FluxComponent(Enum):
     diffuseAstroSec = 7
     GZK = 8
 
+
+
+
 class Weighter:
     """
     A Default type from which all the weighters will be made. 
@@ -57,17 +60,17 @@ class Weighter:
             Logger.Fatal("Expected {}, got {}".format(Weighter, type(other)), TypeError)
 
         Logger.Trace("Combining two weighters")
-    
-        dtype = type(other.dtype ()+ self.dtype())
-        
-        # make a little meta weighter object. It does weighting! 
-        class metaWeighter(Weighter):
-            def __init__(self_meta, dtype):
-                Weighter.__init__(self_meta,dtype)
-            def __call__(self_meta,event):
-                return(self(event)+other(event))
 
-        return(metaWeighter(dtype))
+        return MetaWeighter(self, other, "+")
+
+    def __sub__(self, other):
+        """
+        Same as addition, but now subtraction
+        """
+        if not isinstance(other, Weighter):
+            raise TypeError("Expected {}, got {}".format(Weighter, type(other)))
+            
+        return MetaWeighter(self, other, "-")
 
     def __mul__(self, other):
         """
@@ -78,15 +81,7 @@ class Weighter:
         if not isinstance(other, Weighter):
             raise TypeError("Expected {}, got {}".format(Weighter, type(other)))
 
-        dtype = type(other.dtype()* self.dtype())
-
-        class metaWeighter(Weighter):
-            def __init__(self_meta, dtype):
-                Weighter.__init__(self_meta, dtype)
-            def __call__(self_meta, event):
-                return(self(event)*other(event))
-
-        return(metaWeighter(dtype))
+        return MetaWeighter(self, other,"*")
     
     def __div__(self, other):
         """
@@ -95,15 +90,42 @@ class Weighter:
         if not isinstance(other, Weighter):
             raise TypeError("Expected {}, got {}".format(Weighter, type(other)))
 
-        dtype = type(other.dtype() / self.dtype())
+        return MetaWeighter(self, other, "-")
 
-        class metaWeighter(Weighter):
-            def __init__(self_meta, dtype):
-                Weighter.__init__(self_meta, dtype)
-            def __call__(self_meta, event):
-                return(self(event)/other(event))
+class MetaWeighter(Weighter):
+    def __init__(self, parent1, parent2, op):
+        if not isinstance(parent1, Weighter):
+            Logger.Fatal("I need a {}, not a {}".format(Weighter, type(parent1)), TypeError)
+        if not isinstance(parent2, Weighter):
+            Logger.Fatal("I need a {}, not a {}".format(Weighter, type(parent2)), TypeError)
+        if op!="+" and op!="-" and op!="*" and op!="/":
+            Logger.Fatal("Not sure how to combine weighters with {}".format(op))
 
-        return(metaWeighter(dtype))
+        self._parent1 = parent1
+        self._parent2 = parent2
+        self._op = op
+        if self._op=="+":
+            self._dtype = type(parent1.dtype() + parent2.dtype())        
+        elif self._op=="-":
+            self._dtype = type(parent1.dtype() + parent2.dtype())
+        elif self._op=="*":
+            self._dtype = type(parent1.dtype() + parent2.dtype())
+        elif self._op=="/":
+            self._dtype = type(parent1.dtype() + parent2.dtype())
+        else:
+            Logger.Fatal("Reached the UNREACHABLE")
+
+    def __call__(self, event):
+        if self._op=="+":
+            return self._parent1(event) + self._parent2(event)
+        elif self._op=="-":
+            return self._parent1(event) - self._parent2(event)
+        elif self._op=="*":
+            return self._parent1(event) * self._parent2(event)
+        elif self._op=="/":
+            return self._parent1(event) / self._parent2(event)
+        else:
+            Logger.Fatal("Reached the Unreachable")
 
 # ======================= Implemented Weighters ==================================
 
