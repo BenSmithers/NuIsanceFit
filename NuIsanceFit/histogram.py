@@ -138,7 +138,7 @@ def get_loc(x, domain, just_left=False):
 
     while not (domain[lower_bin]<=x and domain[upper_bin]>=x):
         if abs(max_abs-min_abs)<=1:
-            Logger.Log("Was {} in {}",format(x, domain))
+            Logger.Log("Was {} in {}".format(x, domain))
             Logger.Fatal("get_loc failed. Was the data unsorted?",Exception)
 
         if x<domain[lower_bin]:

@@ -1,18 +1,25 @@
 from NuIsanceFit.event import Event, EventCache
 from NuIsanceFit.param import params as global_params
-
 from NuIsanceFit.logger import Logger 
 
 from math import log10
 import photospline as ps
 from enum import Enum
 from numbers import Number
+import os 
+from glob import glob # finding the attenuation splines
 """
 Here we design and implement classes to Weight events
 
 The 
 """
+
+# when you cast these as strings, they look like
+#    FluxComponent.atmConv 
 class FluxComponent(Enum):
+    """
+    A simple enum to keep track of the different flux components 
+    """
     atmConv = 0
     atmPrompt = 1
     atmMuon = 2
@@ -22,8 +29,6 @@ class FluxComponent(Enum):
     diffuseAstro_tau = 6
     diffuseAstroSec = 7
     GZK = 8
-
-
 
 
 class Weighter:
@@ -93,7 +98,16 @@ class Weighter:
         return MetaWeighter(self, other, "-")
 
 class MetaWeighter(Weighter):
+    """
+    This is a class used to combine two weighter objects together according to some operation. 
+    """
     def __init__(self, parent1, parent2, op):
+        """
+        Make the metaweighter using the two parent weighters, and some operation we use to combine them 
+
+        The supported operations are: +, -, /, and *
+        The operation should be passed as a string (LENGTH 1) 
+        """
         if not isinstance(parent1, Weighter):
             Logger.Fatal("I need a {}, not a {}".format(Weighter, type(parent1)), TypeError)
         if not isinstance(parent2, Weighter):
@@ -104,28 +118,26 @@ class MetaWeighter(Weighter):
         self._parent1 = parent1
         self._parent2 = parent2
         self._op = op
-        if self._op=="+":
-            self._dtype = type(parent1.dtype() + parent2.dtype())        
-        elif self._op=="-":
-            self._dtype = type(parent1.dtype() + parent2.dtype())
-        elif self._op=="*":
-            self._dtype = type(parent1.dtype() + parent2.dtype())
-        elif self._op=="/":
-            self._dtype = type(parent1.dtype() + parent2.dtype())
-        else:
-            Logger.Fatal("Reached the UNREACHABLE")
+        self._dtype = type(self._combine(parent1.dtype() , parent2.dtype()))
 
     def __call__(self, event):
+        return self._combine(self._parent1(event), self._parent2(event))
+    
+    def _combine(self, obj1, obj2):
+        """
+        Use the configured operation to combined the two objects we are passed 
+        """
         if self._op=="+":
-            return self._parent1(event) + self._parent2(event)
+            return obj1 + obj2
         elif self._op=="-":
-            return self._parent1(event) - self._parent2(event)
+            return obj1- obj2
         elif self._op=="*":
-            return self._parent1(event) * self._parent2(event)
+            return obj1 * obj2
         elif self._op=="/":
-            return self._parent1(event) / self._parent2(event)
+            return obj1 / obj2
         else:
             Logger.Fatal("Reached the Unreachable")
+
 
 # ======================= Implemented Weighters ==================================
 
@@ -169,9 +181,7 @@ class antiparticleWeighter(Weighter):
 
 class cachedValueWeighter(Weighter):
     """
-    Wait the whole concept of this weighter seems stupid. It's just a number. That's... like... all it is. 
-
-    So we just give it a cache object and it returns that?
+    I'm pretty sure this will just save a number and return it 
     """
     def __init__(self, cache, key):
         Weighter.__init__(self, float)
@@ -192,7 +202,7 @@ class SplineWeighter(Weighter):
     def __init__(self, spline, dtype):
         Weighter.__init__(dtype)
         if not isinstance(spline, ps.SplineTable):
-            Logger.Fatal("Need Spline... not a {}".format(type(spline)))
+            Logger.Fatal("Need Spline... not a {}".format(type(spline)), TypeError)
         self._spline = spline
         self._zero = dtype()
 
@@ -201,19 +211,19 @@ class SplineWeighter(Weighter):
         return self._spline
 
     def __call__(self,event):
-        coordinates = (log10(event.primaryEnergy), event.primaryZenith)
+        coordinates = (log10(event.primaryEnergy), event.primaryZenith) #note: we already keep the event zenith in cosTh space 
         correction = self.spline(coordinates)
         if correction<self._zero:
-            Logger.Fatal("Made a negative weight: {}".format(correction))
+            Logger.Fatal("Made a negative weight: {}".format(correction), ValueError)
         return self.dtype(correction)
 
 class DOMEffWeighter(SplineWeighter):
     def __init__(self, domSpline, deltaDomEff, flux, dtype):
         SplineWeighter.__init__(self, domSpline, dtype)
         if not isinstance(deltaDomEff, Number):
-            Logger.Fatal("deltaDomEff should be number, not {}".format(type(deltaDomEff)))
+            Logger.Fatal("deltaDomEff should be number, not {}".format(type(deltaDomEff)), TypeError)
         if not isinstance(flux, FluxComponent):
-            Logger.Fatal("Need {}, not {}".format(FluxComponent, type(flux)))
+            Logger.Fatal("Need {}, not {}".format(FluxComponent, type(flux)), TypeError)
 
         self._deltaDomEff = deltaDomEff
 
@@ -226,7 +236,7 @@ class atmosphericUncertaintyWeighter(SplineWeighter):
     def __init__(self, spline, scale, dtype=float):
         SplineWeighter.__init__(self, spline, dtype)
         if not isinstance(scale, dtype):
-            Logger.Fatal("Expected {}, not {}".format(dtype, type(scale)))
+            Logger.Fatal("Expected {}, not {}".format(dtype, type(scale)), TypeError)
         self._scale = scale 
     def __call__(self, event):
         value = SplineWeighter.__call__(self, event)
@@ -234,12 +244,16 @@ class atmosphericUncertaintyWeighter(SplineWeighter):
         return self.dtype(value)
 
 class AttenuationWeighter(Weighter):
-    def __init__(self, flux, xs_scaling, cross_sections, secondaries_included, dtype):
+    """
+    This is the attenuation weighter. It has a (energy, zenith) spline of attenuation for each possible combination of "FluxComponent" and "primaryType"
+    """
+    def __init__(self, spline_map, fluxComp, scale_nu, dtype):
         Weighter.__init__(self, dtype)
-        if not isinstance(xs_scaling, dtype):
-            Logger.Fatal("xs_scaling must be {}, not {}".format(dtype, type(xs_scaling)))
-        if not isinstance(flux, FluxComponent):
-            Logger.Fatal("Give me a {} flux, not a {}".format(FluxComponent, type(flux)))
+        if not isinstance(fluxComp, FluxComponent):
+            Logger.Fatal("Expected {}, got {}".format(FluxComponent, type(fluxComp)), TypeError)
+        if not isinstance(scale_nu, dtype):
+            Logger.Fatal("Expected {} for scale_nu, got {}".format(dtype, type(scale_nu)), TypeError)
+
             
 
 
@@ -274,6 +288,26 @@ class WeighterMaker:
         resources = steering["resources"]
         self._atmosphericDensityUncertaintySpline = ps.SplineTable(resources["atmospheric_density_spline"])
         self._kaonLossesUncertaintySpline = ps.SplineTable(resources["atmospheric_kaonlosses_spline"])
+
+        attenuation_spline_files = glob(resources["attenuation_splines"]+"/*.fits")
+        self._attenuationSplineDict = {}
+        for item in attenuation_spline_files:
+            dirname, filename = os.path.split(item)
+
+            # cut off the extension
+            filename = ".".join(filename.split(".")[:-1])
+
+            # access the different parts (nuMu, numuBar, etc...)
+            broken_up = filename.split("_")
+            fluxComponent = getattr(FluxComponent, broken_up[-2])
+            particleType = broken_up[-1] # TODO: Update this when we have dedicated particle types from nuSQuIDS or LeptonWeighter <--- this one  
+            
+            # make sure we have the right structure to do this
+            if fluxComponent not in self._attenuationSplineDict:
+                self._attenuationSplineDict[fluxComponent] = {}
+
+            # load in the spline 
+            self._attenuationSplineDict[fluxComponent][particleType] = ps.SplineTable(item)
 
     def __call__(self, params): 
 
