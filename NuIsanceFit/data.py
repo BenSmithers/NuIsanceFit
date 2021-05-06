@@ -161,7 +161,7 @@ class Data:
             #new_event.setIntX( data["I3MCWeightDict"][i_event][5] )
             #new_event.setIntY( data["I3MCWeightDict"][i_event][6] )
         
-            target_hist.add(new_event, new_event.energy, new_event.zenith) new_event.azimuth, new_event.topology, new_event.year)
+            target_hist.add(new_event, new_event.energy, new_event.zenith, new_event.azimuth, new_event.topology, new_event.year)
 
             if i_event%100000==0:
                 Logger.Log("Loaded {} Events so far".format(i_event))
