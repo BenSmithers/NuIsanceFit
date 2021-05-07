@@ -2,7 +2,7 @@ from threading import Thread
 import time
 import numpy as np
 
-from .logger import Logger 
+from NuIsanceFit.logger import Logger 
 
 
 # these are global return intermediates

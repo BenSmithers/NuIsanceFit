@@ -88,10 +88,11 @@ _hist_type = bHist
 _bin_type = eventBin
 
 class llhMachine:
-    def __init__(self, data_obj):
+    def __init__(self, data_obj, steering):
         """
         Machine for calculating the likelihood of an observation, given simulation, for a set of parameters  
         """
+        self._steering = steering
         self._minimum = None # only non-None type when minimized 
    
         self._prior = PriorSet()
@@ -105,8 +106,8 @@ class llhMachine:
         self.setSimWeighterMaker( simWeighterMaker )
         self._dataWeighterMaker = None
 
-        self._simulation = None # list/tuple of data 
-        self._observation = None # singular histogram of data
+        self._simulation = data_obj.simulation
+        self._observation = data_obj.data
 
         self._seeds = None # list of seeds
 
@@ -114,15 +115,7 @@ class llhMachine:
         self._llhdtype = float
         self.setLikelihoodFunc( SAYLikelihood )
 
-        self._configure_with_data(data_obj)
-
     # ========================== Getters and Setters ===============================
-    def _configure_with_data(self, data_obj):
-        if not isinstance(data_obj, Data):
-            Logger.Fatal("Can only pass {} as data obj, not {}".format(Data, type(data_obj)))
-
-        self._observation = data_obj.data
-        self._simulation = data_obj.simulation
 
     @property
     def prior(self):
@@ -136,7 +129,7 @@ class llhMachine:
 
 
     def setSimWeighterMaker(self, weighterMaker):
-        self._simWeighterMaker = weighterMaker()
+        self._simWeighterMaker = weighterMaker(self._steering)
     @property
     def simWeighterMaker(self):
         return self._simWeighterMaker
@@ -183,6 +176,8 @@ class llhMachine:
             this_obs = obs[i] 
             this_sim = sim[i]
 
+            
+
             # get total weight of events oveserved in this bin
             observationAmount = sum([self._dataWeighter(event) for event in this_obs])
 
@@ -199,7 +194,10 @@ class llhMachine:
                 assert(w2>=0)
                 n_events += event.num_events
                 expectationWeights[i_event] = w
-                expectationSqWeights[i_event] = w2
+                expectationSqWeights[i_event] = w2/event.num_events
+
+                if not event.is_mc:
+                    Logger.Fatal("Doing simulation weighting on Data! Something is very wrong")
 
                 if np.isnan(w) or np.isinf(w):
                     Logger.Warn("Bad Weight {} for Event {}".format(w, event))
@@ -212,9 +210,18 @@ class llhMachine:
             # this should work on anything with a defined "+" operation 
             w_sum = np.sum(expectationWeights)
             w2_sum = np.sum(expectationSqWeights)
+            if (observationAmount>0 and w_sum<=0):
+                Logger.Warn("Bad Bin! Printing Weights!")
+                for w in expectationWeights:
+                    Logger.Warn("    {}".format(w))
+                Logger.Warn("Events")
+                for event in this_sim:
+                    Logger.Warn("    {}".format(event))
+                continue
+
             this_llh = self.likelihoodFunc(observationAmount, w_sum, w2_sum, self._llhdtype)
             if np.isnan(this_llh) or np.isinf(this_llh):
-                Logger.Warn("Bad llh {} found! From obs {}, {} w_sum, {} w_2".format(this_llh, observationAmount, w_sum, w2_sum))
+                Logger.Warn("Bad llh {} found! From obs {}, w_sum {}, w_2 {}".format(this_llh, observationAmount, w_sum, w2_sum))
 
             llh += this_llh
         

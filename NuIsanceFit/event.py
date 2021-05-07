@@ -1,5 +1,5 @@
 import enum
-from .logger import Logger
+from NuIsanceFit.logger import Logger
 from numbers import Number 
 
 import numpy as np
@@ -115,9 +115,9 @@ class Event:
         self._primaryZenith =zenith
     def setTotalColumnDepth(self, totalColumnDepth):
         if not isinstance(totalColumnDepth, Number):
-            Logger.Fatal("TCD needs to be a number, not {}".format(type(totalColumnDepth)))
+            Logger.Fatal("TCD needs to be a number, not {}".format(type(totalColumnDepth)), TypeError)
         if totalColumnDepth<0:
-            Logger.Fatal("TCD cannot be negative".format(totalColumnDepth))
+            Logger.Fatal("TCD cannot be negative: {}".format(totalColumnDepth), ValueError)
         self._totalColumnDepth = totalColumnDepth
     def setIntX(self, intX):
         if not isinstance(intX, Number):
@@ -231,6 +231,18 @@ class Event:
         raise NotImplementedError()
     def __mul__(self, other):
         raise NotImplementedError()
+
+    def __str__(self):
+        rep = "Event: "
+        rep += "    energy {}\n".format(self.energy)
+        rep += "    zenith {}\n".format(self.zenith)
+        rep += "    azimuth {}\n".format(self.azimuth)
+        rep += "    oneWeight {}\n".format(self.oneWeight)
+        rep += "    primaryEnergy {}\n".format(self.primaryEnergy)
+        rep += "    primaryAzimuth {}\n".format(self.primaryAzimuth)
+        rep += "    primaryZenith {}\n".format(self.primaryZenith)
+        rep += "    isMC {}".format(self.is_mc)
+        return rep
 
 def buildEventFromData(self, dataEvent):
     raise NotImplementedError("Still need to implement this")
