@@ -26,8 +26,8 @@
         }
     },
     "datadir":"/home/benito/software/golem_fit/sources/GolemFit/monte_carlo/HESE/",
-    "simToLoad":"nue_dom_081.h5",
-    "dataToLoad":"numu_p2_0_half2.h5",
+    "simToLoad":"numu_p2_0_half2.h5",
+    "dataToLoad":"numu_p2_0_half1.h5",
     "mctype":"LeptonWeighter",
     "livetimes":{
         "0":331.0,
@@ -41,6 +41,9 @@
         "resource_dir":"/home/benito/software/golem_fit/sources/GolemFit/resources",
         "atmospheric_density_spline":"AtmosphericZenithVariationSplines/atm_density_1s.fits",
         "atmospheric_kaonlosses_spline":"AtmosphericKaonLossesSplines/kaon_loses_1s.fits",
-        "attenuation_splines":"AttenuationSplines/STERILE"
+        "attenuation_spl1ines":"AttenuationSplines/STERILE",
+        "dom_splines":"DOMEffSplines/STERILE",
+        "hq_dom_splines":"/resources/RELDOMEffSplines",
+        "ice_gradients":"/resources/IceGradients"
     }
 }
