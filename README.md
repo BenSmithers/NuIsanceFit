@@ -28,20 +28,28 @@ Find the most likely one
 
 Check out the workboard in the Projects tab! As I do more work here, I'll keep adding more projects there. 
 
-Major style guidelines 
+## Major style guidelines 
  - functions and classes should have a docstring that explains what the thing does
  - If you have a choice between clear (but verbose) and concise (but obtuse), choose clear
  - No tabs; use four spaces
  - Nothing should be hard-coded. Use configuration files
  - Use descriptive names for variables. If the function of a variable is not immediately obvious, you should probably rename it. 
 
-And other major rules
+## And other major rules
  - raise exceptions at unexpected situations. The exception message should provide enough detail to debug 
  - always check inputs in functions. Use `isinstance` and not `type(...)==[...]` 
  - Always test your code before committing 
  - Do **not** import anything into the global namespace. No `from numpy import *` allowed. This is a pain for debugging, especially when there's overlap 
 
-## Some other suggestions
+
+## Naming Schemes
+
+I'm not the most consistent about this (yet). But, I'm working on switching to... 
+ - use `camelCase` for the most part
+ - Classes should start capitalized: `PowerLawTiltWeighter`
+ - Prefix internal attributes and functions names with a `_`
+
+## Assorted Suggestions
 
 ### Methods/Functions
 
