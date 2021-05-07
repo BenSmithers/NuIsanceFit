@@ -61,7 +61,6 @@ class LoggerClass:
         self.Trace("Initializing Logger")
 
 
-
     def connect(self, target):
         """
         This way we can connect some other object to this logger, and potentially display the log output in some gui (or whatever)
@@ -126,5 +125,3 @@ class LoggerClass:
 
 # may want to have these settings changed in some config file? 
 Logger = LoggerClass(level=log_level,visual=True)
-Logger.Log("Logger Initialized, Testing Log")
-Logger.Log("Successfully Logging")
