@@ -238,7 +238,6 @@ class bHist:
         
         # note: get_loc returns the indices of the edges that border this point. So we grab the left-edge; the bin number
         bin_loc = tuple([get_loc( args[i], self._edges[i], True) for i in range(len(args))]) # get the bin for each dimension
-        Logger.Trace("Binning at {}".format(bin_loc))
 
         # Verifies that nothing in the list is None-type
         if all([x is not None for x in bin_loc]):
