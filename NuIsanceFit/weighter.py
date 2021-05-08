@@ -501,7 +501,7 @@ class WeighterMaker:
         edges, values = self._extract_edges_values(self._ice_grad_data[0])
         ice_grad_0 = IceGradientWeighter(edges, values, params["icegrad0"], dtype)
 
-        edges, values = self._extract_edges_values(self._ice_grad_data[0])
+        edges, values = self._extract_edges_values(self._ice_grad_data[1])
         ice_grad_1 = IceGradientWeighter(edges, values, params["icegrad1"], dtype)
 
         conventionalComponent = params["convNorm"]*aduw*kluw*(convPionFlux+ params["piKRatio"]*convKaonFlux 
