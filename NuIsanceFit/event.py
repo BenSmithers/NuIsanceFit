@@ -9,39 +9,46 @@ from math import pi
 Here, we describe the Event classes and methods for interacting with the events 
 """
 
-class EventCache:
+def EventCache():
     """
     This object is used to cache various properties used during the Weighting 
+
+    We use a dicionary here instead of a dedicated class to synergize better with the Weighters.
+    There, we make classes that access one part of the cache. So, we construct those cache weighters with a key. 
+    The alternative would be to use a "getattr" function with the class.
+
+    The getattr function is kinda slow though. So, instead we do a key access. 
     """
-    def __init__(self):
-        # quantities
-        self.livetime = 0.0
-        self.weight = 0.0
+    this_dict = {}
+    # quantities
+    this_dict["livetime"] = 0.0
+    this_dict["weight"] = 0.0
 
-        # flux cache
-        self.convPionWeight = 0.0
-        self.convKaonWeight = 0.0
-        self.convWeight = 0.0
-        self.promptWeight = 0.0
-        self.astroMuWeight = 0.0
-        
-        # barr cache
-        self.barrModWP = 0.0
-        self.barrModWM = 0.0
-        self.barrModYP = 0.0
-        self.barrModYM = 0.0
-        self.barrModZP = 0.0
-        self.barrModZM = 0.0
+    # flux cache
+    this_dict["convPionWeight"] = 0.0
+    this_dict["convKaonWeight"] = 0.0
+    this_dict["convWeight"] = 0.0
+    this_dict["promptWeight"] = 0.0
+    this_dict["astroMuWeight"] = 0.0
+    
+    # barr cache
+    this_dict["barrModWP"] = 0.0
+    this_dict["barrModWM"] = 0.0
+    this_dict["barrModYP"] = 0.0
+    this_dict["barrModYM"] = 0.0
+    this_dict["barrModZP"] = 0.0
+    this_dict["barrModZM"] = 0.0
 
-        # holeice cache
-        self.holeIceConv = 0.0
-        self.holeIcePrompt = 0.0
-        self.holeIceAstro = 0.0
+    # holeice cache
+    this_dict["holeIceConv"] = 0.0
+    this_dict["holeIcePrompt"] = 0.0
+    this_dict["holeIceAstro"] = 0.0
 
-        #dom efficiency cache
-        self.domEffConv = 0.0
-        self.domEffPrompt = 0.0
-        self.domEffAstro = 0.0
+    #dom efficiency cache
+    this_dict["domEffConv"] = 0.0
+    this_dict["domEffPrompt"] = 0.0
+    this_dict["domEffAstro"] = 0.0
+    return this_dict
 
 
 class Event:
@@ -223,7 +230,7 @@ class Event:
 
     # ========================= Utilities ============================
     def _get_meta_weight(self):
-        return self._cachedweight.convWeight + self._cachedweight.promptWeight + self._cachedweight.astroMuWeight
+        return self._cachedweight["convWeight"] + self._cachedweight["promptWeight"] + self._cachedweight["astroMuWeight"]
 
     def __add__(self, other):
         raise NotImplementedError()

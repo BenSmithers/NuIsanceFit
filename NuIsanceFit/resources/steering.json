@@ -46,5 +46,10 @@
         "hq_dom_splines":"/resources/RELDOMEffSplines",
         "ice_gradients":"/resources/IceGradients",
         "hole_ice_splines":"HoleIceSplines/STERILE"
+    },
+    "fixed_params":{
+        "medianConvEnergy":2020.0,
+        "medianPromptEnergy":2020.0,
+        "astroPivotEnergy":1.0e5
     }
 }

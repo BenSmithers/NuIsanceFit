@@ -185,19 +185,20 @@ class AntiparticleWeighter(Weighter):
 
 class CachedValueWeighter(Weighter):
     """
-    I'm pretty sure this will just save a number and return it 
+    This is used to return a weight from an Event's cache! 
     """
-    def __init__(self, cache, key):
+    def __init__(self, key):
         Weighter.__init__(self, float)
-        if not isinstance(cache, EventCache):
-            Logger.Fatal("Cannot create cache of type {}".format(type(cache)))
         if not isinstance(key, str):
             Logger.Fatal("Access key must be {}, not {}".format(str, type(key)))
-        self.cache = cache 
+        if not (key in EventCache()):
+            Logger.Fatal("Invalid Event Cache key {}".format(key))
+        
         self.key = key
 
     def __call__(self, event):
-        return getattr(self.cache, self.key)
+        Weighter.__call__(self,event)
+        return event.cachedweight[self.key]
 
 class SplineWeighter(Weighter):
     """
@@ -283,11 +284,11 @@ class TopoWeighter(FluxCompWeighter):
 
     def __call__(self, event):
         if self.fluxComp == FluxComponent.atmConv:
-            cache = event.EventCache.domEffConv
+            cache = event.cachedWeight["domEffConv"]
         elif self.fluxComp == FluxComponent.atmPrompt:
-            cache = event.EventCache.domEffPrompt
+            cache = event.cachedWeight["domEffPrompt"]
         elif self.fluxComp == FluxComponent.diffuseAstro_mu:
-            cache = event.EventCache.domEffAstro
+            cache = event.cachedWeight["domEffAstro"]
         else:
             Logger.Fatal("Should be unreachable")
 
@@ -422,6 +423,11 @@ class WeighterMaker:
         Splines and stuff... 
         """
         resources = steering["resources"]
+
+        self.medianConvEnergy = steering["fixed_params"]["medianConvEnergy"]
+        self.medianPromptEnergy = steering["fixed_params"]["medianPromptEnergy"]
+        self.astroPivotEnergy = steering["fixed_params"]["astroPivotEnergy"]
+
         Logger.Log("Loading in splines for Weighting")
         Logger.Trace("    {}".format(resources["atmospheric_density_spline"]))
         self._atmosphericDensityUncertaintySpline = ps.SplineTable(resources["atmospheric_density_spline"])
@@ -459,7 +465,19 @@ class WeighterMaker:
         #Logger.Trace("Astro")
         #astroComponent          = PowerLawTiltWeighter(params["astroNorm"]*1e5, -2.0 + params["astroDeltaGamma"])
 
-        neuaneu_t = AntiparticleWeighter(params["NeutrinoAntineutrinoRatio"])
+        # The caches! 
+        astroMuFlux = CachedValueWeighter("astroMuWeight")
+        convPionFlux = CachedValueWeighter("convPionWeight")
+        convKaonFlux = CachedValueWeighter("convKaonWeight")
+        promptFlux = CachedValueWeighter("promptWeight")
+        barrWPComp = CachedValueWeighter("barrModWP")
+        barrWMComp = CachedValueWeighter("barrModWM")
+        barrYPComp = CachedValueWeighter("barrModYP")
+        barrYMComp = CachedValueWeighter("barrModYM")
+        barrZPComp = CachedValueWeighter("barrModZP")
+        barrZMComp = CachedValueWeighter("barrModZM")
+
+        neuaneu_w = AntiparticleWeighter(params["NeutrinoAntineutrinoRatio"])
 
         aduw = AtmosphericUncertaintyWeighter(self._atmosphericDensityUncertaintySpline, params["zenithCorrection"])
         kluw = AtmosphericUncertaintyWeighter(self._kaonLossesUncertaintySpline, params["kaonLosses"])
@@ -472,8 +490,9 @@ class WeighterMaker:
         promptDOMEff = TopoWeighter(self._domSplines, FluxComponent.atmPrompt, params["domEfficiency"], dtype)
         astroNuMuDOMEff = TopoWeighter(self._domSplines, FluxComponent.diffuseAstro_mu, params["domEfficiency"], dtype)
 
-        hqconvDOMEff = TopoWeighter(self._hqdomSplines, FluxComponent.atmConv, params["hqdomEffficiency"],dtype)
-        hqpromptDOMEff = TopoWeighter(self._hqdomSplines, FluxComponent.atmPrompt, params["hqdomEffficiency"],dtype)
+        # these aren't actually used. 
+        #hqconvDOMEff = TopoWeighter(self._hqdomSplines, FluxComponent.atmConv, params["hqdomEffficiency"],dtype)
+        #hqpromptDOMEff = TopoWeighter(self._hqdomSplines, FluxComponent.atmPrompt, params["hqdomEffficiency"],dtype)
 
         convHoleIceWeighter = TopoWeighter(self._holeiceSplines, FluxComponent.atmConv, params["holeiceForward"], dtype)
         promptHoleIceWeighter = TopoWeighter(self._holeiceSplines, FluxComponent.atmPrompt, params["holeiceForward"], dtype)
@@ -485,4 +504,27 @@ class WeighterMaker:
         edges, values = self._extract_edges_values(self._ice_grad_data[0])
         ice_grad_1 = IceGradientWeighter(edges, values, params["icegrad1"], dtype)
 
-        conventionalComponent = aduw*kluw
+        conventionalComponent = params["convNorm"]*aduw*kluw*(convPionFlux+ params["piKRatio"]*convKaonFlux 
+                                +params["barrWP"]*barrWPComp +params["barrWM"]*barrWMComp +params["barrZP"]*barrZPComp
+                                +params["barrZM"]*barrZMComp +params["barrYP"]*barrYPComp +params["barrYM"]*barrYMComp) \
+                                *PowerLawTiltWeighter(self.medianConvEnergy, params["CRDeltaGamma"]) \
+                                *convHoleIceWeighter*convDOMEff \
+                                *ice_grad_0 \
+                                *ice_grad_1 \
+                                *conv_nu_att_weighter
+
+        promptComponent = params["promptNorm"]*promptFlux*promptHoleIceWeighter*promptDOMEff \
+                            *PowerLawTiltWeighter(self.medianPromptEnergy, params["CRDeltaGamma"]) \
+                            *ice_grad_0 \
+                            *ice_grad_1 \
+                            *prompt_nu_att_weighter
+        
+        astroComponent = params["astroNorm"]*astroMuFlux \
+                            *astroNuMuHoleIceWeighter*astroNuMuDOMEff \
+                            *PowerLawTiltWeighter(self.astroPivotEnergy, params["astroDeltaGamma"])\
+                            *ice_grad_0 \
+                            *ice_grad_1 \
+                            *astro_nu_att_weighter \
+                            *neuaneu_w
+
+        return conventionalComponent+promptComponent+astroComponent
