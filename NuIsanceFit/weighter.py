@@ -1,7 +1,7 @@
 from NuIsanceFit.event import Event, EventCache
 from NuIsanceFit.param import params as global_params
 from NuIsanceFit.logger import Logger 
-from NuIsanceFit.histogram import get_loc
+from NuIsanceFit.histogram import get_loc, get_closest
 
 from math import log10
 import photospline as ps
@@ -263,13 +263,20 @@ class FluxCompWeighter(Weighter):
         
 
 
-class DOMEffWeighter(FluxCompWeighter):
-    def __init__(self, spline_map, fluxComp, domEfficiency, dtype):
+class TopoWeighter(FluxCompWeighter):
+    """
+    This kind of weighter reweights the events according to their topologies. 
+    This is used by the 
+        DOMEfficiency Weighters
+        HQ DOM Efficiency Weighters
+        the Hole Ice Weighters
+    """
+    def __init__(self, spline_map, fluxComp, scale_factor, dtype):
         FluxCompWeighter.__init__(self, spline_map, fluxComp, dtype)
-        if not isinstance(domEfficiency, dtype):
-            Logger.Fatal("Expected {}, got {}, for dom efficiency".format(dtype, type(domEfficiency)))
+        if not isinstance(scale_factor, dtype):
+            Logger.Fatal("Expected {}, got {}, for dom efficiency".format(dtype, type(scale_factor)))
         
-        self.domEfficiency = domEfficiency
+        self.scale_factor = scale_factor
 
         if not (self.fluxComp == FluxComponent.atmConv or self.fluxComp == FluxComponent.atmPrompt or self.fluxComp == FluxComponent.diffuseAstro_mu):
             Logger.Fatal("Weighter configured with disallowed flux component: {}".format(self.fluxComp), ValueError)
@@ -290,9 +297,9 @@ class DOMEffWeighter(FluxCompWeighter):
         elif event._topology == 1:
             access_topo = "cascade"
         else:
-            Logger.Fatal("Unsupported track topology for the DOM Efficiency weighter! {}".format(event._topology), ValueError)
+            Logger.Fatal("Unsupported track topology for the topology weighter! {}".format(event._topology), ValueError)
 
-        coordinates = (log10(event.primaryEnergy), event.zenith  , self.domEfficiency)
+        coordinates = (log10(event.primaryEnergy), event.zenith  , self.scale_factor)
         correction = self.spline_map[self.fluxComp][access_topo](coordinates)
         if correction < 0:
             Logger.Fatal("Weighter returned negative weight {}!".format(correction),ValueError)
@@ -337,6 +344,7 @@ class IceGradientWeighter(Weighter):
             Logger.Fatal("Expected scale of type {}, got {}".format(dtype, type(scale)), ValueError)
 
         self._bin_edges = bin_edges
+        self._bin_centers = [(self._bin_edges[i+1]+self._bin_edges[i])/2. for i in range(len(self._bin_edges)-1)]
         self._gradient = gradient
 
         self._scale = scale
@@ -344,7 +352,14 @@ class IceGradientWeighter(Weighter):
     def __call__(self, event):
         Weighter.__call__(self, event)
 
-        index = get_loc(log10(event.energy), self._bin_edges)
+        value = get_loc(log10(event.energy), self._bin_centers, self._gradient)
+        if value is None:
+            return self.dtype(1.0)
+        
+        rel = (1.0+value)*self._scale
+        if rel<0:
+            Logger.Fatal("Somehow got negative weight {}".format(rel))
+        return rel
         
 
 """
@@ -355,7 +370,7 @@ TODO:
     holeIceWeighter
         DONE atmosphericDensityUncertainty weighter
         DONE kaonLossesUncertainty weighter 
-    icegradient weighter 
+        DONE icegradient weighter 
         DONE attenuationWeighter
 
 This will require some spline stuff 
@@ -417,6 +432,8 @@ class WeighterMaker:
         self._domSplines = fill_fluxcomp_dict(resources["dom_splines"])
         self._hqdomSplines = fill_fluxcomp_dict(resources["hq_dom_splines"])
 
+        self._holeiceSplines = fill_fluxcomp_dict(resources["hole_ice_splines"])
+
         # Now the ice gradients?
         eff_grad_files = glob(resources["ice_gradients"]+"/Energy_Eff_Grad_*.txt")
         # in these 
@@ -435,12 +452,12 @@ class WeighterMaker:
 
         Logger.Trace("Creating new metaWeighter")
 
-        Logger.Trace("Conv")
-        conventionalComponent   = PowerLawTiltWeighter(params["convNorm"]*1e5, -2.5 + params["CRDeltaGamma"])
-        Logger.Trace("Prompt")
-        promptComponent         = PowerLawTiltWeighter(params["promptNorm"]*1e5, -2.5 )
-        Logger.Trace("Astro")
-        astroComponent          = PowerLawTiltWeighter(params["astroNorm"]*1e5, -2.0 + params["astroDeltaGamma"])
+        #Logger.Trace("Conv")
+        #conventionalComponent   = PowerLawTiltWeighter(params["convNorm"]*1e5, -2.5 + params["CRDeltaGamma"])
+        #Logger.Trace("Prompt")
+        #promptComponent         = PowerLawTiltWeighter(params["promptNorm"]*1e5, -2.5 )
+        #Logger.Trace("Astro")
+        #astroComponent          = PowerLawTiltWeighter(params["astroNorm"]*1e5, -2.0 + params["astroDeltaGamma"])
 
         neuaneu_t = AntiparticleWeighter(params["NeutrinoAntineutrinoRatio"])
 
@@ -451,13 +468,21 @@ class WeighterMaker:
         prompt_nu_att_weighter = AttenuationWeighter(self._attenuationSplineDict, FluxComponent.atmPrompt, params["nuxs"], params["nubarxs"], dtype)
         astro_nu_att_weighter = AttenuationWeighter(self._attenuationSplineDict, FluxComponent.diffuseAstro_mu, params["nuxs"], params["nubarxs"], dtype)
 
-        convDOMEff = DOMEffWeighter(self._domSplines, FluxComponent.atmConv, params["domEfficiency"], dtype)
-        promptDOMEff = DOMEffWeighter(self._domSplines, FluxComponent.atmPrompt, params["domEfficiency"], dtype)
-        astroNuMuDOMEff = DOMEffWeighter(self._domSplines, FluxComponent.diffuseAstro_mu, params["domEfficiency"], dtype)
+        convDOMEff = TopoWeighter(self._domSplines, FluxComponent.atmConv, params["domEfficiency"], dtype)
+        promptDOMEff = TopoWeighter(self._domSplines, FluxComponent.atmPrompt, params["domEfficiency"], dtype)
+        astroNuMuDOMEff = TopoWeighter(self._domSplines, FluxComponent.diffuseAstro_mu, params["domEfficiency"], dtype)
 
-        hqconvDOMEff = DOMEffWeighter(self._hqdomSplines, FluxComponent.atmConv, params["hqdomEffficiency"],dtype)
-        hqpromptDOMEff = DOMEffWeighter(self._hqdomSplines, FluxComponent.atmPrompt, params["hqdomEffficiency"],dtype)
+        hqconvDOMEff = TopoWeighter(self._hqdomSplines, FluxComponent.atmConv, params["hqdomEffficiency"],dtype)
+        hqpromptDOMEff = TopoWeighter(self._hqdomSplines, FluxComponent.atmPrompt, params["hqdomEffficiency"],dtype)
 
+        convHoleIceWeighter = TopoWeighter(self._holeiceSplines, FluxComponent.atmConv, params["holeiceForward"], dtype)
+        promptHoleIceWeighter = TopoWeighter(self._holeiceSplines, FluxComponent.atmPrompt, params["holeiceForward"], dtype)
+        astroNuMuHoleIceWeighter = TopoWeighter(self._holeiceSplines, FluxComponent.diffuseAstro_mu, params["holeiceForward"], dtype)
 
-        return( conventionalComponent + promptComponent + astroComponent )
+        edges, values = self._extract_edges_values(self._ice_grad_data[0])
+        ice_grad_0 = IceGradientWeighter(edges, values, params["icegrad0"], dtype)
 
+        edges, values = self._extract_edges_values(self._ice_grad_data[0])
+        ice_grad_1 = IceGradientWeighter(edges, values, params["icegrad1"], dtype)
+
+        conventionalComponent = aduw*kluw

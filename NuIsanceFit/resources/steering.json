@@ -44,6 +44,7 @@
         "attenuation_spl1ines":"AttenuationSplines/STERILE",
         "dom_splines":"DOMEffSplines/STERILE",
         "hq_dom_splines":"/resources/RELDOMEffSplines",
-        "ice_gradients":"/resources/IceGradients"
+        "ice_gradients":"/resources/IceGradients",
+        "hole_ice_splines":"HoleIceSplines/STERILE"
     }
 }

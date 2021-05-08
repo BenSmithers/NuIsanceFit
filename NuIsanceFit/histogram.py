@@ -156,6 +156,44 @@ def get_loc(x, domain, just_left=False):
     else:
         return(lower_bin, upper_bin)
 
+def get_closest(x, domain, mapped):
+    """
+    We imagine some function maps from "domain" to "mapped"
+
+    We have several points evaluated for this function
+        domain - list-like of floats. 
+        mapped - list-like of floats. Entries in domain, evaluated by the function
+
+    The user provides a value "x," and then we interpolate the mapped value on either side of 'x' to approximate the mapped value of 'x' 
+    
+    This is really just a linear interpolator 
+    """
+    if not isinstance(domain, (tuple,list,np.ndarray)):
+        raise TypeError("'domain' has unrecognized type {}, try {}".format(type(domain), list))
+    if not isinstance(mapped, (tuple,list,np.ndarray)):
+        print(mapped)
+        raise TypeError("'mapped' has unrecognized type {}, try {}".format(type(mapped), list))
+    if not isinstance(x, (float,int)):
+        raise TypeError("'x' should be number-like, not {}".format(type(x)))
+
+    if len(domain)!=len(mapped):
+        raise ValueError("'domain' and 'mapped' should have same length, got len(domain)={}, len(mapped)={}".format(len(domain), len(mapped)))
+
+    lower_bin, upper_bin = get_loc(x, domain)
+
+    # linear interp time
+    x1 = domain[lower_bin]
+    x2 = domain[upper_bin]
+    y1 = mapped[lower_bin]
+    y2 = mapped[upper_bin]
+
+    slope = (y2-y1)/(x2-x1)
+    value = (x*slope + y2 -x2*slope)
+
+#    print("({}, {}) to ({}, {}) gave {}".format(x1,y1,x2,y2, value))
+
+    return(value)
+
 # one note - I'm manually entering in these flatten and transpose arrays, and you might be wondering why I didn't just use numpy arrays.
 # Numpy arrays don't really like having non-numbers inside, and so they had issues with the Event objects
 # so, I had to use lists. And since I'm using lists, we need these special functions 
