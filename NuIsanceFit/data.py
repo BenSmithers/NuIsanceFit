@@ -106,6 +106,7 @@ class Data:
         self._azimuthEdges = make_edges(bins, "azimuth")
         self._topoEdges = [-0.5, 0.5, 1.5] # only two bins to catch 0 and 1
         self._timeEdges = make_edges(bins, "year") 
+        self._livetime = 1.0 # this should come from the steering 
 
         # ENERGY | COSTH | AZIMUTH | TOPOLOGY | TIME
         self.simulation = bHist([ self._Eedges, self._cosThEdges, self._azimuthEdges, self._topoEdges, self._timeEdges ], bintype=eventBin,datatype=Event)
@@ -114,6 +115,11 @@ class Data:
         # TODO use different loadMC function depending on mctype (from steering)
         self.loadMC()
         self.loadData()
+
+    def _fillCache(self, event):
+        if not isinstance(event, Event):
+            Logger.Fatal("Cannot add cache to {}",format(type(event)), TypeError)
+        event.setCache(EventCache(event._oneWeight, self._livetime))
 
     def _loadFile(self, which_file, target_hist, is_mc):
         """
@@ -149,14 +155,14 @@ class Data:
 
             if is_mc:
                 new_event.is_mc = True
-                #new_event.setPrimaryEnergy(  _primary[i_event][11] )
-                #new_event.setPrimaryAzimuth( _primary[i_event][10] )
-                #new_event.setPrimaryZenith( cos(_primary[i_event][9]) )
                 new_event.setPrimaryEnergy(  _weight[i_event][33] )
                 new_event.setPrimaryAzimuth( _weight[i_event][32] )
                 new_event.setPrimaryZenith( cos(_weight[i_event][35]) )
-
+                new_event.setNumEvents( _weight[i_event][27] )
                 new_event.setOneWeight(_weight[i_event][29] )
+                self._fillCache(new_event)
+
+
             # I was finding negative Bjorkens while loading in data. Need to investiagate what's up with that...
             #new_event.setIntX( data["I3MCWeightDict"][i_event][5] )
             #new_event.setIntY( data["I3MCWeightDict"][i_event][6] )

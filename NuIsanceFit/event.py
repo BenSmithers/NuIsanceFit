@@ -9,7 +9,7 @@ from math import pi
 Here, we describe the Event classes and methods for interacting with the events 
 """
 
-def EventCache():
+def EventCache(cache_weight, livetime):
     """
     This object is used to cache various properties used during the Weighting 
 
@@ -21,33 +21,33 @@ def EventCache():
     """
     this_dict = {}
     # quantities
-    this_dict["livetime"] = 0.0
-    this_dict["weight"] = 0.0
+    this_dict["livetime"] = livetime
+    this_dict["weight"] = cache_weight
 
     # flux cache
-    this_dict["convPionWeight"] = 0.0
-    this_dict["convKaonWeight"] = 0.0
-    this_dict["convWeight"] = 0.0
-    this_dict["promptWeight"] = 0.0
-    this_dict["astroMuWeight"] = 0.0
+    this_dict["convPionWeight"] = cache_weight
+    this_dict["convKaonWeight"] = cache_weight
+    this_dict["convWeight"] = this_dict["convPionWeight"]
+    this_dict["promptWeight"] = cache_weight
+    this_dict["astroMuWeight"] = cache_weight
     
     # barr cache
-    this_dict["barrModWP"] = 0.0
-    this_dict["barrModWM"] = 0.0
-    this_dict["barrModYP"] = 0.0
-    this_dict["barrModYM"] = 0.0
-    this_dict["barrModZP"] = 0.0
-    this_dict["barrModZM"] = 0.0
+    this_dict["barrModWP"] = cache_weight
+    this_dict["barrModWM"] = cache_weight
+    this_dict["barrModYP"] = cache_weight
+    this_dict["barrModYM"] = cache_weight
+    this_dict["barrModZP"] = cache_weight
+    this_dict["barrModZM"] = cache_weight
 
     # holeice cache
-    this_dict["holeIceConv"] = 0.0
-    this_dict["holeIcePrompt"] = 0.0
-    this_dict["holeIceAstro"] = 0.0
+    this_dict["holeIceConv"] = cache_weight
+    this_dict["holeIcePrompt"] = cache_weight
+    this_dict["holeIceAstro"] = cache_weight
 
     #dom efficiency cache
-    this_dict["domEffConv"] = 0.0
-    this_dict["domEffPrompt"] = 0.0
-    this_dict["domEffAstro"] = 0.0
+    this_dict["domEffConv"] = cache_weight
+    this_dict["domEffPrompt"] = cache_weight
+    this_dict["domEffAstro"] = cache_weight
     return this_dict
 
 
@@ -89,7 +89,7 @@ class Event:
 
         self._year = 0
 
-        self._cachedweight = EventCache()
+        self._cachedweight = EventCache(0.0, 0.0)
 
     # =================== Getters and Setters =======================
     """
@@ -97,11 +97,14 @@ class Event:
 
     All of these work the same exact way, and just set some parameter. 
     """
+    def setCache(self, which):
+        if not isinstance(which, dict):
+            Logger.Fatal("Expected cache, not {}".format(type(dict)))
+        self._cachedweight = which
     def setPrimaryType(self, which):
-        if not isinstance(which, int):
+        if False: #not isinstance(which, int):
             Logger.Fatal("Particle ID uses PDG ID, must be {}, not {}".format(int, type(which)))
         self._primaryType = which 
-
     def setPrimaryEnergy(self, energy):
         if not isinstance(energy, Number):
             Logger.Fatal("Cannot set energy to {}".format(type(energy)))

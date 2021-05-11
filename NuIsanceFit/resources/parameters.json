@@ -86,7 +86,7 @@
     },
     "domEfficiency":{
         "fit":true,
-        "center":0.99,
+        "center":1.27,
         "width":100.0
     },
     "hqdomEffficiency":{
@@ -172,21 +172,21 @@
     },
     "icegrad0":{
         "fit":false,
-        "center":0.0,
+        "center":1.0,
         "width":1.0,
         "min":-5,
         "max":5
     },
     "icegrad1":{
         "fit":false,
-        "center":0.0,
+        "center":1.0,
         "width":1.0,
         "min":-5,
         "max":5
     },
     "icegrad2":{
         "fit":false,
-        "center":0.0,
+        "center":1.0,
         "width":0.5,
         "min":-5,
         "max":5

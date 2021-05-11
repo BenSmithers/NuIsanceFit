@@ -41,10 +41,10 @@
         "resource_dir":"/home/benito/software/golem_fit/sources/GolemFit/resources",
         "atmospheric_density_spline":"AtmosphericZenithVariationSplines/atm_density_1s.fits",
         "atmospheric_kaonlosses_spline":"AtmosphericKaonLossesSplines/kaon_loses_1s.fits",
-        "attenuation_spl1ines":"AttenuationSplines/STERILE",
+        "attenuation_splines":"AttenuationSplines/STERILE",
         "dom_splines":"DOMEffSplines/STERILE",
-        "hq_dom_splines":"/resources/RELDOMEffSplines",
-        "ice_gradients":"/resources/IceGradients",
+        "hq_dom_splines":"RELDOMEffSplines/STERILE",
+        "ice_gradients":"IceGradients/STERILE",
         "hole_ice_splines":"HoleIceSplines/STERILE"
     },
     "fixed_params":{

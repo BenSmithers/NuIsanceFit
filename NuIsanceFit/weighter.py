@@ -88,6 +88,9 @@ class Weighter:
         This produces a meta-Weighter using two other weighters. This weighter weights a given event with the parent weighters, then multiplies the weights together and returns the product 
         """
         return MetaWeighter(self, other,"*")
+
+    def __rmul__(self, other):
+        return MetaWeighter(self, other, "*")
     
     def __div__(self, other):
         """
@@ -181,6 +184,7 @@ class AntiparticleWeighter(Weighter):
         Weighter.__init__(self, float)
         self.balance = balance
     def __call__(self, event):
+        Logger.Trace("AP return {}".format(self.balance if event.primaryType<0 else 2-self.balance))
         return( self.balance if event.primaryType<0 else 2-self.balance)
 
 class CachedValueWeighter(Weighter):
@@ -191,21 +195,21 @@ class CachedValueWeighter(Weighter):
         Weighter.__init__(self, float)
         if not isinstance(key, str):
             Logger.Fatal("Access key must be {}, not {}".format(str, type(key)))
-        if not (key in EventCache()):
+        if not (key in EventCache(1.0,1.0)):
             Logger.Fatal("Invalid Event Cache key {}".format(key))
         
         self.key = key
 
     def __call__(self, event):
         Weighter.__call__(self,event)
-        return event.cachedweight[self.key]
+        return event.cachedWeight[self.key]
 
 class SplineWeighter(Weighter):
     """
     Generic spliney Weighter. I'm using this as an intermediate so I don't have to keep writing out the spline check
     """
     def __init__(self, spline, dtype):
-        Weighter.__init__(dtype)
+        Weighter.__init__(self, dtype)
         if not isinstance(spline, ps.SplineTable):
             Logger.Fatal("Need Spline... not a {}".format(type(spline)), TypeError)
         self._spline = spline
@@ -220,6 +224,7 @@ class SplineWeighter(Weighter):
         correction = self.spline(coordinates)
         if correction<self._zero:
             Logger.Fatal("Made a negative weight: {}".format(correction), ValueError)
+        Logger.Trace("Spline Correcto {}".format(correction))
         return self.dtype(correction)
 
 
@@ -237,6 +242,7 @@ class AtmosphericUncertaintyWeighter(SplineWeighter):
     def __call__(self, event):
         value = SplineWeighter.__call__(self, event)
         value = 1.0 + value*self._scale
+        Logger.Trace("Atmo Uncertainty Weight {}".format(value))
         return self.dtype(value)
 
 class FluxCompWeighter(Weighter):
@@ -256,12 +262,13 @@ class FluxCompWeighter(Weighter):
         self._present_component = self.fluxComp in spline_map
 
         if not self._present_component:
-            Logger.Fatal("Found no flux component {} in spline map".format(self.fluxComp), KeyError)
+            Logger.Fatal("Found no flux component {} in spline map, which has {}".format(self.fluxComp, spline_map.keys()), KeyError)
         for key in self.spline_map[self.fluxComp]:
             if not isinstance(self.spline_map[self.fluxComp][key], ps.SplineTable):
                 Logger.Fatal("Found entry in the spline map, {}:{}, which is not a spline. It's a {}".format(self.fluxComp, key, type(self.spline_map[self.fluxComp][key])), TypeError)
 
-        
+    def __call__(self, event):
+        Logger.Fatal("Use derived class", NotImplemented)
 
 
 class TopoWeighter(FluxCompWeighter):
@@ -302,13 +309,13 @@ class TopoWeighter(FluxCompWeighter):
 
         coordinates = (log10(event.primaryEnergy), event.zenith  , self.scale_factor)
         correction = self.spline_map[self.fluxComp][access_topo](coordinates)
-        if correction < 0:
-            Logger.Fatal("Weighter returned negative weight {}!".format(correction),ValueError)
-
-        if correction==0.0 or np.isnan(correction):
+        
+        if np.isnan(correction):
+            Logger.Warn("Cow, coords {}".format(coordinates))
             # This is a cow? We just ignore cows? 
-            return 0.0
+            return self.dtype(0.0)
         else: 
+            Logger.Trace("Topo Correcto {}".format(correction))
             return pow(10., correction - cache) 
 
 class AttenuationWeighter(FluxCompWeighter):
@@ -325,6 +332,7 @@ class AttenuationWeighter(FluxCompWeighter):
     def __call__(self, event):
         Weighter.__call__(self, event)
         if event.primaryType not in self.spline_map[self.fluxComp]:
+            Logger.Warn("Cow {} and {}".format(self.fluxComp, self.dtype(1.0)))
             return self.dtype(1.0)
         if event.primaryType>0:
             scale = self.scale_nu
@@ -335,6 +343,7 @@ class AttenuationWeighter(FluxCompWeighter):
         correction = self.spline_map[self.fluxComp][event.primaryType](coordinates)
         if correction < 0:
             Logger.Fatal("Weighter returned negative weight {}!".format(correction),ValueError)
+        Logger.Trace("Attenuation: {}".format(correction))
         return correction
         
 
@@ -353,13 +362,14 @@ class IceGradientWeighter(Weighter):
     def __call__(self, event):
         Weighter.__call__(self, event)
 
-        value = get_loc(log10(event.energy), self._bin_centers, self._gradient)
-        if value is None:
+        gradbin = get_loc(log10(event.energy), self._bin_centers)
+        if gradbin is None:
             return self.dtype(1.0)
-        
-        rel = (1.0+value)*self._scale
+
+        rel = (1.0+self._gradient[gradbin[0]])*self._scale
         if rel<0:
             Logger.Fatal("Somehow got negative weight {}".format(rel))
+        Logger.Trace("Grad: {}".format(rel))
         return rel
         
 
@@ -380,7 +390,10 @@ Should probably also restructure these weighters to be built from a params objec
 """
 
 def fill_fluxcomp_dict(folder):
-    files = glob(folder+"/*fits.")
+    files = glob(folder+"/*.fits")
+    if len(files)==0:
+        Logger.Fatal("Didn't find any splines in {}".format(folder), IOError)
+
     ret_dict = {}
     for item in files:
         Logger.Trace("    {}".format(item))
@@ -391,21 +404,45 @@ def fill_fluxcomp_dict(folder):
 
         # access the different parts (nuMu, numuBar, etc...)
         broken_up = filename.split("_")
-        # we do this because of unpleasant naming conventions for the splines 
-        if broken_up[3]=="diffuseAstro":
-            fc = "_".join(broken_up[3:5])  #eg, duffuseAstro_mu
-        else:
-            fc = broken_up[3]  #eg, atmConv
 
-        fluxComponent = getattr(FluxComponent, fc)
         subComponent = broken_up[-1] # TODO: Update this when we have dedicated particle types from nuSQuIDS or LeptonWeighter <--- this one  
+        if "mu" in subComponent.lower():
+            pid = 13
+        elif "e" in subComponent.lower():
+            pid = 15
+        elif "tau" in subComponent.lower():
+            pid = 17
+        else:
+            pid = subComponent
+        if "nu" in subComponent.lower():
+            pid+=1
+        if "minus" in subComponent.lower() or "bar" in subComponent.lower():
+            pid*=-1
+        
+
+
+        component1 = broken_up[-3]
+        component2 = broken_up[-2]
+
+        # we do this because of unpleasant naming conventions for the splines 
+        if component2=="mu" and component1=="diffuseAstro":
+            fc = "_".join([component1,component2]) #eg, duffuseAstro_mu
+        else:
+            fc = component2#eg, atmConv
+
+        try:
+            fluxComponent = getattr(FluxComponent, fc)
+        except AttributeError:
+            Logger.Warn("Working in {}".format(folder))
+            Logger.Warn("File {}".format(item))
+            Logger.Fatal("Failed", ValueError)
         
         # make sure we have the right structure to do this
         if fluxComponent not in ret_dict:
             ret_dict[fluxComponent] = {}
 
         # load in the spline 
-        ret_dict[fluxComponent][subComponent] = ps.SplineTable(item)
+        ret_dict[fluxComponent][pid] = ps.SplineTable(item)
 
     return ret_dict
 
@@ -442,6 +479,8 @@ class WeighterMaker:
 
         # Now the ice gradients?
         eff_grad_files = glob(resources["ice_gradients"]+"/Energy_Eff_Grad_*.txt")
+        if len(eff_grad_files)==0:
+            Logger.Fatal("Found no files in {}".format(resources["ice_gradients"]))
         # in these 
         #   0 is left side of bin
         #   1 is right side of bin
@@ -449,7 +488,7 @@ class WeighterMaker:
         self._ice_grad_data = [np.loadtxt(fname, dtype=float, delimiter=" ").transpose() for fname in eff_grad_files]
 
     def _extract_edges_values(self, entry):
-        edges = entry[0].append(entry[1][-1])
+        edges = np.append(entry[0], entry[1][-1])
         values= entry[1]
         return edges, values
 
