@@ -14,7 +14,7 @@ from NuIsanceFit.param import paramPoint, PriorSet
 from NuIsanceFit.logger import Logger 
 from NuIsanceFit.weighter import Weighter
 from NuIsanceFit.weighter import WeighterMaker as simWeighterMaker
-from NuIsanceFit.weighter import simpleDataWeighter 
+from NuIsanceFit.weighter import SimpleDataWeighter 
 from NuIsanceFit.histogram import bHist, eventBin, flatten, transpose
 from NuIsanceFit.nuthread import ThreadManager
 from NuIsanceFit.event import Event
@@ -98,7 +98,7 @@ class llhMachine:
         self._prior = PriorSet()
         self._includePriors = True
 
-        self._dataWeighter = simpleDataWeighter()
+        self._dataWeighter = SimpleDataWeighter()
         self._simWeighter = None
 
         self._weighttype = float
@@ -233,7 +233,7 @@ class llhMachine:
         Then we use the core function 
         """
         Logger.Trace("Making sim/data Weighters")
-        self._dataWeighter = simpleDataWeighter()
+        self._dataWeighter = SimpleDataWeighter()
         self._simWeighter = self.simWeighterMaker(params)
  
         # If this is outside our valid parameter space, BAIL OUT
