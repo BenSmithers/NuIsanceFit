@@ -84,5 +84,9 @@ Try to avoid using bloated uncommon dependencies except where necessary. Numpy, 
 
 Other dependencies:
  - Photospline 
+ - SQuIDS (for nuSQuIDS)
  - nuSQuIDSpy
  - LeptonWeighter
+ - nuflux (for LW, use `pip3 install --user git+https://github.com/icecube/nuflux`)
+
+When in installing the squids and LW, remember to set your `LD_LIBRARY_PATH`

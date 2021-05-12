@@ -1,45 +1,23 @@
-from NuIsanceFit.logger import Logger
-
-"""
-This is where we actually build the data and simulation histograms 
-
-Sim keys:
- 'FinalStateX',
- 'FinalStateY',
- 'FinalType0',
- 'FinalType1',
- 'ImpactParameter',
- 'MuExAzimuth',
- 'MuExEnergy',
- 'MuExZenith',
- 'NuAzimuth',
- 'NuEnergy',
- 'NuZenith',
- 'PrimaryType',
- 'TotalColumnDepth',
- '__I3Index__',
- 'oneweight'
-
-Data keys:
- 'dec_reco',
- 'energy_reco',
- 'is_cascade',
- 'is_track',
- 'ra_reco',
- 'time',
- 'year',
- 'zenith_reco'
-"""
-
+from NuIsanceFit import Logger
 from NuIsanceFit.histogram import bHist, eventBin
 from NuIsanceFit.event import Event, EventCache
+from NuIsanceFit import simdata
 
-import time
 from numbers import Number
 import numpy as np
 import h5py as h5
 import os
 from math import log10, cos
+import sys
+
+try:
+    import nuSQuIDS as nsq
+except ImportError:
+    # older nusquids installations have a differently named nusquids module. 
+    # I don't think we'll rely on any new-new features, so let's allow this 
+    import nuSQuIDSpy as nsq
+
+import LeptonWeighter as LW
 
 def make_edges(bin_params, key):
     """
@@ -83,9 +61,7 @@ class Data:
         self.steering = steering
 
        # year, azimuth, zenith, energy  
-
-        self._simToLoad = [steering["simToLoad"]]
-        self._simToLoad = [os.path.join( steering["datadir"], entry) for entry in self._simToLoad]
+        self._simToLoad = self._get_filtered_sims()
 
         self._dataToLoad = [steering["dataToLoad"]]
         self._dataToLoad = [os.path.join( steering["datadir"], entry) for entry in self._dataToLoad]
@@ -116,9 +92,44 @@ class Data:
         self.loadMC()
         self.loadData()
 
+        # make some weighters
+        self._lic_files = []
+        for entry in self._simToLoad:
+            name = os.path.join(steering["datadir"],entry["lic_file"])
+            self._lic_files += LW.MakeGeneratorsFromLICFile(name)
+
+        self._xs_obj = LW.CrossSectionFromSpline(self.steering["diff_nu_cc_xs"], self.steering["diff_nubar_cc_xs"],
+                                                    self.steering["diff_nu_nc_xs"], self.steering["diff_nubar_nc_xs"])
+
+        self._pionFluxWeighter = LW.Weighter(self.steering["pion_atmo_flux"],self._xs_obj, self._lic_files)
+        self._promptFluxWeighter = LW.Weighter(self.steering["prompt_atmo_flux"],self._xs_obj, self._lic_files)
+        self._kaonFluxWeighter = LW.Weighter(self.steering["kaon_atmo_file"],self._xs_obj, self._lic_files)
+        self._astroFluxWeighter = LW.Weighter(self.steering["astro_file"],self._xs_obj, self._lic_files)
+
+    def _get_filtered_sims(self):
+        # first we grab the relevant simsets, filtering by name
+        init_f = filter(lambda fullname:self.steering["simToLoad"]["name"] in fullname, simdata)
+
+        # users may have specified advaned sets 
+        for check_key in self.steering["simToLoad"]:
+            if str(check_key)=="name":
+                continue
+            else:
+                init_f = filter(lambda entry: self.steering["simToLoad"][check_key]==entry[check_key], init_f)
+        
+        init_f = list(init_f)
+
+        init_d = {}
+        for key in init_f:
+            init_d[key] = simdata[key]
+        return init_d
+
     def _fillCache(self, event):
         if not isinstance(event, Event):
             Logger.Fatal("Cannot add cache to {}",format(type(event)), TypeError)
+
+        
+
         event.setCache(EventCache(event._oneWeight, self._livetime))
 
     def _loadFile(self, which_file, target_hist, is_mc):
@@ -180,42 +191,11 @@ class Data:
         Uses the generic data loader to load simulation
         """
         for entry in self._simToLoad:
-            self._loadFile( entry, self.simulation, True )
+            self._loadFile(os.path.join( self.steering["datadir"], entry["filename"]), self.simulation, True )
+
     def loadData(self):
         """
         Uses the generic data loader to load... the data
         """
         for entry in self._dataToLoad:
             self._loadFile( entry, self.data, False)
-
-"""
-This is where we actually build the data and simulation histograms 
-
-Sim keys:
- 'FinalStateX',
- 'FinalStateY',
- 'FinalType0',
- 'FinalType1',
- 'ImpactParameter',
- 'MuExAzimuth',
- 'MuExEnergy',
- 'MuExZenith',
- 'NuAzimuth',
- 'NuEnergy',
- 'NuZenith',
- 'PrimaryType',
- 'TotalColumnDepth',
- '__I3Index__',
- 'oneweight'
-
-Data keys:
- 'dec_reco',
- 'energy_reco',
- 'is_cascade',
- 'is_track',
- 'ra_reco',
- 'time',
- 'year',
- 'zenith_reco'
-"""
-

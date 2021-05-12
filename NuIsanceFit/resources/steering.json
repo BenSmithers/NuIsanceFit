@@ -26,7 +26,9 @@
         }
     },
     "datadir":"/home/benito/software/golem_fit/sources/GolemFit/monte_carlo/HESE/",
-    "simToLoad":"numu_p2_0_half2.h5",
+    "simToLoad":{
+        "name":"Platinum_Split"
+    },
     "dataToLoad":"numu_p2_0_half1.h5",
     "mctype":"LeptonWeighter",
     "livetimes":{
@@ -45,7 +47,16 @@
         "dom_splines":"DOMEffSplines/STERILE",
         "hq_dom_splines":"RELDOMEffSplines/STERILE",
         "ice_gradients":"IceGradients/STERILE",
-        "hole_ice_splines":"HoleIceSplines/STERILE"
+        "hole_ice_splines":"HoleIceSplines/STERILE",
+        "conv_atmo_flux":"Fluxes/conventional/conventional_atmospheric.hdf5",
+        "prompt_atmo_flux":"Fluxes/prompt/prompt_atmospheric.hdf5",
+        "kaon_atmo_file":"Fluxes/conventional/kaon_atmospheric.hdf5",
+        "pion_atmo_file":"Fluxes/conventional/pion_atmospheric.hdf5",
+        "astro_file":"Fluxes/astro/astro.hdf5",
+        "diff_nu_cc_xs":"CrossSections/dsdxdy_nu_CC_iso.fits",
+        "diff_nubar_cc_xs":"CrossSections/dsdxdy_nubar_CC_iso.fits",
+        "diff_nu_nc_xs":"CrossSections/dsdxdy_nu_NC_iso.fits",
+        "diff_nubar_nc_xs":"CrossSections/dsdxdy_nubar_NC_iso.fits"
     },
     "fixed_params":{
         "medianConvEnergy":2020.0,
