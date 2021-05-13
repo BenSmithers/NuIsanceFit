@@ -1,7 +1,7 @@
 from NuIsanceFit.event import Event, EventCache
 from NuIsanceFit.param import params as global_params
 from NuIsanceFit.logger import Logger 
-from NuIsanceFit.histogram import get_loc, get_closest
+from NuIsanceFit.histogram import get_loc
 
 from math import log10
 import photospline as ps
