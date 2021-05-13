@@ -25,12 +25,12 @@
             "log":false 
         }
     },
-    "datadir":"/home/benito/software/golem_fit/sources/GolemFit/monte_carlo/HESE/",
+    "datadir":"/home/benito/software/golem_fit/sources/GolemFit/monte_carlo/STERILE/",
     "simToLoad":{
-        "name":"Platinum_Split"
+        "name":"Platinum_lite_HE"
     },
-    "dataToLoad":"numu_p2_0_half1.h5",
-    "mctype":"LeptonWeighter",
+    "dataToLoad":"IC86_EHE_Nominal_Platinum_6687.h5",
+    "mctype":"STERILE",
     "livetimes":{
         "0":331.0,
         "1":331.0,
@@ -56,7 +56,8 @@
         "diff_nu_cc_xs":"CrossSections/dsdxdy_nu_CC_iso.fits",
         "diff_nubar_cc_xs":"CrossSections/dsdxdy_nubar_CC_iso.fits",
         "diff_nu_nc_xs":"CrossSections/dsdxdy_nu_NC_iso.fits",
-        "diff_nubar_nc_xs":"CrossSections/dsdxdy_nubar_NC_iso.fits"
+        "diff_nubar_nc_xs":"CrossSections/dsdxdy_nubar_NC_iso.fits",
+        "barr_location":"barrgradients"
     },
     "fixed_params":{
         "medianConvEnergy":2020.0,

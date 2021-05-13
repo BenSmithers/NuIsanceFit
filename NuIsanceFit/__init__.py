@@ -19,7 +19,7 @@ for entry in simdata:
     if not os.path.exists( os.path.join(steering["datadir"], simdata[entry]["filename"] )):
         Logger.Warn("Could not find file at {}".format(os.path.join(steering["datadir"], simdata[entry]["filename"] )))
 
-Logger.Log("Validating File Existence")
+Logger.Log("Validating Resource File Existence")
 # now, we prepend the root resource directory to the beginning of these file names / folder names! 
 for key in steering["resources"]:
     if key =="resource_dir":

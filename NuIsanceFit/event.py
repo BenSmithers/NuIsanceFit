@@ -3,7 +3,7 @@ from NuIsanceFit.logger import Logger
 from numbers import Number 
 
 import numpy as np
-from math import pi
+from math import pi, cos
 
 """
 Here, we describe the Event classes and methods for interacting with the events 
@@ -69,13 +69,15 @@ class Event:
         self._primaryEnergy = 0.0
         self._primaryAzimuth = 0.0
         self._primaryZenith = 0.0
+        self._rawPrimaryZenith = 0.0
         self._primaryType = 0
+        self._finalType0 = 0
+        self._finalType1 = 0
         self._totalColumnDepth = 0.0
         self._intX = 0
         self._intY = 0
 
         self._oneWeight = 0.0
-
         self._num_events = 1
 
         self._energy = 0.0
@@ -86,7 +88,6 @@ class Event:
        
         # 0 is track, 1 is cascade
         self._topology = 0
-
         self._year = 0
 
         self._cachedweight = EventCache(0.0, 0.0)
@@ -129,6 +130,17 @@ class Event:
         if totalColumnDepth<0:
             Logger.Fatal("TCD cannot be negative: {}".format(totalColumnDepth), ValueError)
         self._totalColumnDepth = totalColumnDepth
+    def setRawZenith(self, rawzenith):
+        """
+        This sets both the raw zenith and the zenith
+        """
+        if not isinstance(rawzenith, Number):
+            Logger.Fatal("raw zenith should be a {}, not a {}".format(Number, type(rawzenith)))
+        if not ((rawzenith>0) and (rawzenith<pi)):
+            Logger.Fatal("Zenith angle should be between 0 and pi")
+        self._rawPrimaryZenith = rawzenith
+        self.setPrimaryZenith(cos(self._rawPrimaryZenith))
+
     def setIntX(self, intX):
         if not isinstance(intX, Number):
             Logger.Fatal("Bjorken X should be a number, not {}".format(type(intX)))
@@ -183,11 +195,28 @@ class Event:
         if year<0:
             Logger.Fatal("Cannot have negative year {}".format(year))
         self._year = year
+    def setFinalType0(self, value):
+        if not isinstance(value, int):
+            Logger.Fatal("ID should be an int, not {}".format(type(value)))
+        self._finalType0 = value
+    def setFinalType1(self, value):
+        if not isinstance(value, int):
+            Logger.Fatal("ID should be an int, not {}".format(type(value)))
+        self._finalType1 = value
     # =================== The Getters
     # they get parameters. 
     @property
+    def rawPrimaryZenith(self):
+        return self._rawPrimaryZenith
+    @property
     def primaryType(self):
         return self._primaryType
+    @property
+    def finalType0(self):
+        return self._finalType0
+    @property
+    def finalType1(self):
+        return self._finalType1
     @property
     def primaryEnergy(self):
         return self._primaryEnergy
@@ -253,6 +282,3 @@ class Event:
         rep += "    primaryZenith {}\n".format(self.primaryZenith)
         rep += "    isMC {}".format(self.is_mc)
         return rep
-
-def buildEventFromData(self, dataEvent):
-    raise NotImplementedError("Still need to implement this")
