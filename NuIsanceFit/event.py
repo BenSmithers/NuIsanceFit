@@ -3,7 +3,7 @@ from NuIsanceFit.logger import Logger
 from numbers import Number 
 
 import numpy as np
-from math import pi, cos
+from math import pi, cos, log10
 
 """
 Here, we describe the Event classes and methods for interacting with the events 
@@ -67,6 +67,8 @@ class Event:
         self.is_mc = False
 
         self._primaryEnergy = 0.0
+        self._logPrimaryEnergy = None
+
         self._primaryAzimuth = 0.0
         self._primaryZenith = 0.0
         self._rawPrimaryZenith = 0.0
@@ -81,6 +83,7 @@ class Event:
         self._num_events = 1
 
         self._energy = 0.0
+        self._logEnergy = None
         self._zenith = 0.0
         self._azimuth = 0.0
 
@@ -112,6 +115,7 @@ class Event:
         if energy<=0:
             Logger.Fatal("Cannot set negative energy {}".format(energy))
         self._primaryEnergy = energy
+        self._logPrimaryEnergy = log10(energy)
     def setPrimaryAzimuth(self, azimuth):
         if not isinstance(azimuth, Number):
             Logger.Fatal("Cannot set azimuth to {}".format(type(azimuth)))
@@ -171,6 +175,7 @@ class Event:
         if energy<=0:
             Logger.Fatal("Cannot set negative energy {}".format(energy))
         self._energy = energy
+        self._logEnergy = log10(energy)
     def setAzimuth(self, azimuth):
         if not isinstance(azimuth, Number):
             Logger.Fatal("Cannot set azimuth to {}".format(type(azimuth)))
@@ -221,6 +226,9 @@ class Event:
     def primaryEnergy(self):
         return self._primaryEnergy
     @property
+    def logPrimaryEnergy(self):
+        return self._logPrimaryEnergy
+    @property
     def primaryAzimuth(self):
         return self._primaryAzimuth
     @property
@@ -244,6 +252,9 @@ class Event:
     @property
     def energy(self):
         return self._energy
+    @property
+    def logEnergy(self):
+        return self._logEnergy
     @property 
     def zenith(self):
         return self._zenith
