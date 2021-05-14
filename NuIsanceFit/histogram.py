@@ -284,6 +284,11 @@ class bHist:
             
             return tuple(bin_loc)
 
+    def get_at(self, coords):
+        if not len(coords)==len(self._edges):
+            Logger.Fatal("Incorrect number of coords", ValueError)
+        return itemget(self._fill, coords)
+
     def __getitem__(self, index):
         if not isinstance(index, int):
             Logger.Fatal("Cannot access entry of type {}".format(type(index)),TypeError)

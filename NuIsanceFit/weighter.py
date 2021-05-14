@@ -170,7 +170,7 @@ class BrokenPowerlawTiltWeighter(PowerLawTiltWeighter):
 
     def __call__(self, event):
         Weighter.__call__(self, event)
-        return 5 
+        Logger.Fatal("Not implemented",NotImplementedError)
 
 
 class SimpleDataWeighter(Weighter):
@@ -222,8 +222,7 @@ class SplineWeighter(Weighter):
     def __call__(self,event):
         coordinates = (log10(event.primaryEnergy), event.primaryZenith) #note: we already keep the event zenith in cosTh space 
         correction = self.spline(coordinates)
-        if correction<self._zero:
-            Logger.Fatal("Made a negative weight: {}".format(correction), ValueError)
+        
         Logger.Trace("Spline Correcto {}".format(correction))
         return self.dtype(correction)
 
@@ -543,6 +542,7 @@ class WeighterMaker:
         edges, values = self._extract_edges_values(self._ice_grad_data[1])
         ice_grad_1 = IceGradientWeighter(edges, values, params["icegrad1"], dtype)
 
+        
         conventionalComponent = params["convNorm"]*aduw*kluw*(convPionFlux+ params["piKRatio"]*convKaonFlux 
                                 +params["barrWP"]*barrWPComp +params["barrWM"]*barrWMComp +params["barrZP"]*barrZPComp
                                 +params["barrZM"]*barrZMComp +params["barrYP"]*barrYPComp +params["barrYM"]*barrYMComp) \

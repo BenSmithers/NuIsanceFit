@@ -206,7 +206,7 @@ for entry in _params_raw.keys():
     Logger.Trace("Read new param: {}".format(str(entry)))
     params[str(entry)] = Param(_params_raw[entry])
 
-class paramPoint:
+class ParamPoint:
     """
     Set of values corresponding to the loaded parameters. Has a value for each parameter
     """
@@ -244,7 +244,7 @@ class paramPoint:
 
     def __getitem__(self, key):
         if not isinstance(key, str):
-            Logger.Fatal("Object {} is not subscriptable with type {}, use {}".format(paramPoint, type(key), str), TypeError)
+            Logger.Fatal("Object {} is not subscriptable with type {}, use {}".format(ParamPoint, type(key), str), TypeError)
         if key in self.values:
             return self.values[key]
         else:

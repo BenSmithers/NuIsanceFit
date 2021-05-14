@@ -10,7 +10,7 @@ CPrior
 SAYLikelihood
 """
 
-from NuIsanceFit.param import paramPoint, PriorSet
+from NuIsanceFit.param import ParamPoint, PriorSet
 from NuIsanceFit.logger import Logger 
 from NuIsanceFit.weighter import Weighter
 from NuIsanceFit.weighter import WeighterMaker as simWeighterMaker
@@ -268,13 +268,13 @@ class llhMachine:
         """
 
 
-        return paramPoint()
+        return ParamPoint()
 
     def __call__(self, params):
         """
         Gets the likelihood of the provided parameter point
         """
-        if not isinstance(params, paramPoint):
+        if not isinstance(params, ParamPoint):
             Logger.Fatal("Cannot evaluate LLH for object of type {}".format(type(params)), TypeError)
 
         return self._evaluateLikelihood(params) 
