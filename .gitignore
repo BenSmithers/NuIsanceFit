@@ -6,6 +6,8 @@ __pycache__/
 
 # C extensions
 *.so
+# these are made automatically by cython
+*.c
 
 # Distribution / packaging
 .Python
