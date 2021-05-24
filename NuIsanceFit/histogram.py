@@ -118,10 +118,10 @@ def get_loc(x, domain, just_left=False):
 
     Uses a binary search algorithm
     """
-    if not isinstance(domain, (tuple,list,np.ndarray)):
-        raise TypeError("'domain' has unrecognized type {}, try {}".format(type(domain), list))
-    if not isinstance(x, (float,int)):
-        raise TypeError("'x' should be number-like, not {}".format(type(x)))
+    #if not isinstance(domain, (tuple,list,np.ndarray)):
+    #    raise TypeError("'domain' has unrecognized type {}, try {}".format(type(domain), list))
+    #if not isinstance(x, (float,int)):
+    #    raise TypeError("'x' should be number-like, not {}".format(type(x)))
 
     if len(domain)<=1:
         raise ValueError("get_loc function only works on domains of length>1. This is length {}".format(len(domain)))

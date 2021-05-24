@@ -4,6 +4,8 @@ from NuIsanceFit.data import Data
 from NuIsanceFit.minimizer import llhMachine
 from NuIsanceFit import Logger
 
+from NuIsanceFit.nuthread import ThreadManager
+
 import numpy as np
 
 class Fitter:
@@ -18,7 +20,8 @@ class Fitter:
         if not isinstance(params, ParamPoint):
             Logger.Fatal("Arg 'param' must be {}, not {}".format(ParamPoint, type(params)))
 
-        weighter = self._llhobj.simWeighterMaker(params)
+        self._llhobj._simWeighter.configure(params)
+
 
         sim = self._data.simulation
 
@@ -27,11 +30,13 @@ class Fitter:
 
         dims = tuple([len(sim.edges[i])-1 for i in range(len(sim.edges))])
         
+        #def getter
+
         for i in range(dims[0]):
             for j in range(dims[1]):
                 # let's just fix the other dimensions for now! 
                 for event in sim[i][j][0][0][0]:
-                    result[i][j]+=weighter(event)
+                    result[i][j]+=self._llhobj._simWeighter(event)
 
         return result
 

@@ -13,7 +13,7 @@ SAYLikelihood
 from NuIsanceFit.param import ParamPoint, PriorSet
 from NuIsanceFit.logger import Logger 
 from NuIsanceFit.weighter import Weighter
-from NuIsanceFit.weighter import WeighterMaker as simWeighterMaker
+from NuIsanceFit.weighter import SimWeighter
 from NuIsanceFit.weighter import SimpleDataWeighter 
 from NuIsanceFit.histogram import bHist, eventBin, flatten, transpose
 from NuIsanceFit.nuthread import ThreadManager
@@ -92,6 +92,7 @@ class llhMachine:
         """
         Machine for calculating the likelihood of an observation, given simulation, for a set of parameters  
         """
+        
         self._steering = steering
         self._minimum = None # only non-None type when minimized 
    
@@ -99,11 +100,9 @@ class llhMachine:
         self._includePriors = True
 
         self._dataWeighter = SimpleDataWeighter()
-        self._simWeighter = None
+        self._simWeighter = SimWeighter(self._steering)
 
         self._weighttype = float
-        self._simWeighterMaker = None
-        self.setSimWeighterMaker( simWeighterMaker )
         self._dataWeighterMaker = None
 
         self._simulation = data_obj.simulation
@@ -128,12 +127,6 @@ class llhMachine:
         return self._observation 
 
 
-    def setSimWeighterMaker(self, weighterMaker):
-        self._simWeighterMaker = weighterMaker(self._steering)
-    @property
-    def simWeighterMaker(self):
-        return self._simWeighterMaker
-
     def setDataWeighterMaker(self, weighter):
         self._dataWeighterMaker = weighter
     @property
@@ -151,8 +144,8 @@ class llhMachine:
 
 
     def _validate(self):
-        if not isinstance(self._simWeighter, Weighter):
-            Logger.Fatal("SimWeighter should be {}, not {}".format(Weighter, type(self._simWeighter)), TypeError)
+        if not isinstance(self._simWeighter, SimWeighter):
+            Logger.Fatal("SimWeighter should be {}, not {}".format(SimWeighter, type(self._simWeighter)), TypeError)
         
         #TODO  need to validate the other things!
 
@@ -234,7 +227,7 @@ class llhMachine:
         """
         Logger.Trace("Making sim/data Weighters")
         self._dataWeighter = SimpleDataWeighter()
-        self._simWeighter = self.simWeighterMaker(params)
+        self._simWeighter.configure(params)
  
         # If this is outside our valid parameter space, BAIL OUT
         prior_param = self.prior(params)

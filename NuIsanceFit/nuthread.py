@@ -1,5 +1,4 @@
 from threading import Thread
-import time
 import numpy as np
 
 from NuIsanceFit.logger import Logger 

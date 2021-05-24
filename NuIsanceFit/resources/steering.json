@@ -63,5 +63,7 @@
         "medianConvEnergy":2020.0,
         "medianPromptEnergy":2020.0,
         "astroPivotEnergy":1.0e5
+    },
+    "assorted_config":{
     }
 }
