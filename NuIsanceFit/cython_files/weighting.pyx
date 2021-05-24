@@ -1,10 +1,11 @@
 import cython
 
-from event cimport Event, EventCache
+from event cimport Event
+from event import EventCache
 #from photospline import SplineTable
-from libc.math import isnan
+from libc.math cimport isnan
 
-import libphotospline as ps
+import photospline as ps
 
 cdef class SplineTable:
     cdef object table
@@ -58,48 +59,37 @@ cpdef enum FluxComponent:
     gzk = 8
 
 cdef class Weighter:
-    cdef type _dtype
-
-    def __cinit__(self, type dtype):
-        self.dtype = dtype
-
+    def __cinit__(self, **kwargs):
+        pass
     def __call__(self, Event event):
         pass
 
-    def configure(self, dict params):
+    def configure(self, list params):
         pass
-
-    def set_type(self, type dType):
-        self.dtype = dType
     
 cdef class PowerLawTiltWeighter(Weighter):
-    cdef float medianEnergy
-    cdef float deltaIndex
-
-    def __cinit__(self, type dType, float medianEnergy, float deltaIndex):
-        Weighter.__cinit__(self, dType)
+    def __cinit__(self, float medianEnergy, float deltaIndex):
         self.medianEnergy = medianEnergy
         self.deltaIndex = deltaIndex
 
-    def configure(self, dict params):
-        self.deltaIndex = params["deltaIndex"]
+    def configure(self, list params):
+        self.deltaIndex = params[0]
     
     def __call__(self, Event event):
         pass
 
 cdef class SimpleDataWeighter(Weighter):
-    def __cinit__(self, type dtype):
-        Weighter.__cinit__(self, dtype)
+    def __cinit__(self):
+        pass
     def __call__(self, Event event):
         return 1. #event.cachedWeight.weight
 
 cdef class AntiparticleWeighter(Weighter):
     cdef float balance
     def __cinit__(self, float balance):
-        Weighter.__cinit__(self, float)
         self.balance = balance
-    def configure(self, dict params):
-        self.balance = params["balance"]
+    def configure(self, list params):
+        self.balance = params[0]
     def __call__(self, event):
         return( self.balance if event.primaryType<0 else 2-self.balance)
 
@@ -109,7 +99,6 @@ cdef class CachedValueWeighter(Weighter):
     """
     cdef str key
     def __cinit__(self,str key):
-        Weighter.__cinit__(self, float)
         if not (key in EventCache(1.0,1.0)):
             raise KeyError("Invalid Event Cahe key {}".format(key))
 
@@ -123,17 +112,14 @@ cdef class SplineWeighter(Weighter):
     """
     Generic spliney Weighter. I'm using this as an intermediate so I don't have to keep writing out the spline check
     """
-    def __cinit__(self, SplineTable spline, type dtype):
-        Weighter.__cinit__(self, dtype)
+    def __cinit__(self, SplineTable spline, **kwargs):
         self._spline = spline
 
     def spline(self):
         return self._spline
 
     def __call__(self,Event event):
-        correction = self.spline((event.logPrimaryEnergy, event.primaryZenith)) #note: we already keep the event zenith in cosTh space 
-        return self.dtype(correction)
-
+        return self.spline((event.logPrimaryEnergy, event.primaryZenith)) #note: we already keep the event zenith in cosTh space 
 
 cdef class AtmosphericUncertaintyWeighter(SplineWeighter):
     cdef float _scale
@@ -142,15 +128,14 @@ cdef class AtmosphericUncertaintyWeighter(SplineWeighter):
 
     Seriously, look in GF. Those both are exactly identical functions. I don't get it 
     """
-    def __cinit__(self, SplineTable spline, float scale, type dtype=float):
-        SplineWeighter.__cinit__(self, spline, float)
+    def __cinit__(self, SplineTable spline, float scale):
         self._scale = scale 
-    def configure(self,dict params):
-        self.scale = params["scale"]
+    def configure(self,list params):
+        self.scale = params[0]
     def __call__(self,Event event):
         cdef float value = SplineWeighter.__call__(self, event)
         value = 1.0 + value*self._scale
-        return self.dtype(value)
+        return value
 
 cdef class FluxCompWeighter(Weighter):
     cdef dict spline_map
@@ -158,9 +143,7 @@ cdef class FluxCompWeighter(Weighter):
     """
     This is the attenuation weighter. It has a (energy, zenith) spline of attenuation for each possible combination of "FluxComponent" and "primaryType"
     """
-    def __cinit__(self, dict spline_map,FluxComponent fluxComp, type dtype):
-        Weighter.__cinit__(self, dtype)
-
+    def __cinit__(self, dict spline_map,FluxComponent fluxComp):
         self.fluxComp = fluxComp
         self.spline_map = spline_map
 
@@ -183,15 +166,12 @@ cdef class TopoWeighter(FluxCompWeighter):
         HQ DOM Efficiency Weighters
         the Hole Ice Weighters
     """
-    def __cinit__(self, dict spline_map, FluxComponent fluxComp, float scale_factor,type dtype):
-        FluxCompWeighter.__cinit__(self, spline_map, fluxComp, dtype)
-        
+    def __cinit__(self, dict spline_map, FluxComponent fluxComp, float scale_factor):        
         self.scale_factor = scale_factor
-
         if not (self.fluxComp == FluxComponent.atmConv or self.fluxComp == FluxComponent.atmPrompt or self.fluxComp == FluxComponent.diffuseAstro_mu):
             raise ValueError("Weighter configured with disallowed flux component: {}".format(self.fluxComp))
-    def configure(self, dict params):
-        self.scale_factor = params["scale_factor"]
+    def configure(self, list params):
+        self.scale_factor = params[0]
 
     def __call__(self,Event event):
         if self.fluxComp == FluxComponent.atmConv:
@@ -215,21 +195,20 @@ cdef class TopoWeighter(FluxCompWeighter):
         
         if isnan(correction):
             # This is a cow? We just ignore cows? 
-            return self.dtype(0.0)
+            return 0.0
         else: 
             return 10**(correction - cache) 
 
 cdef class AttenuationWeighter(FluxCompWeighter):
     cdef float scale_nu
     cdef float scale_nubar
-    def __cinit__(self,dict spline_map,FluxComponent fluxComp,float scale_nu,float scale_nubar,type dtype):
-        FluxCompWeighter.__cinit__(self, spline_map, fluxComp, dtype)
+    def __cinit__(self,dict spline_map,FluxComponent fluxComp,float scale_nu,float scale_nubar):
         self.scale_nu = scale_nu
         self.scale_nubar = scale_nubar
 
-    def configure(self,dict params):
-        self.scale_nu = params["scale_nu"]
-        self.scale_nubar = params["scale_nubar"]
+    def configure(self,list params):
+        self.scale_nu = params[0]
+        self.scale_nubar = params[1]
 
     def __call__(self,Event event):
         cdef float scale
@@ -251,23 +230,21 @@ cdef class IceGradientWeighter(Weighter):
     cdef list _bin_centers
     cdef list _gradient  
     cdef float _scale 
-    def __cinit__(self, list bin_edges,list gradient,float scale,type dtype):
-        Weighter.__cinit__(self, dtype)
-
+    def __cinit__(self, list bin_edges,list gradient,float scale):
         self._bin_edges = bin_edges
         self._bin_centers = [(self._bin_edges[i+1]+self._bin_edges[i])/2. for i in range(len(self._bin_edges)-1)]
         self._gradient = gradient
 
         self._scale = scale
 
-    def configure(self,dict params):
-        self.scale = params["scale"]
+    def configure(self,list params):
+        self.scale = params[0]
 
     def __call__(self, Event event):
         cdef int gradbin = get_lower(event.logEnergy, self._bin_centers)
 
         if gradbin == -1:
-            return self.dtype(1.0)
+            return 1.0
 
         cdef float rel = (1.0+self._gradient[gradbin])*self._scale
         if rel<0:

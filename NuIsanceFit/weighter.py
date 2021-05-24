@@ -1,14 +1,11 @@
-from NuIsanceFit.event import Event, EventCache
 from NuIsanceFit.param import ParamPoint, params as global_params
 from NuIsanceFit.logger import Logger 
-from NuIsanceFit.histogram import get_loc
 
 import photospline as ps
-from enum import Enum
-from math import isnan
 import os 
 import numpy as np
 from glob import glob # finding the attenuation splines
+from NuIsanceFit.weighting import * 
 """
 Here we design and implement classes to Weight events
 
@@ -129,18 +126,18 @@ class SimWeighter:
         #astroComponent          = PowerLawTiltWeighter(params["astroNorm"]*1e5, -2.0 + params["astroDeltaGamma"])
 
         # The caches! 
-        self.astroMuFlux = CachedValueWeighter("astroMuWeight")
-        self.convPionFlux = CachedValueWeighter("convPionWeight")
-        self.convKaonFlux = CachedValueWeighter("convKaonWeight")
-        self.promptFlux = CachedValueWeighter("promptWeight")
-        self.barrWPComp = CachedValueWeighter("barrModWP")
-        self.barrWMComp = CachedValueWeighter("barrModWM")
-        self.barrYPComp = CachedValueWeighter("barrModYP")
-        self.barrYMComp = CachedValueWeighter("barrModYM")
-        self.barrZPComp = CachedValueWeighter("barrModZP")
-        self.barrZMComp = CachedValueWeighter("barrModZM")
+        self.astroMuFlux = CachedValueWeighter(key="astroMuWeight")
+        self.convPionFlux = CachedValueWeighter(key="convPionWeight")
+        self.convKaonFlux = CachedValueWeighter(key="convKaonWeight")
+        self.promptFlux = CachedValueWeighter(key="promptWeight")
+        self.barrWPComp = CachedValueWeighter(key="barrModWP")
+        self.barrWMComp = CachedValueWeighter(key="barrModWM")
+        self.barrYPComp = CachedValueWeighter(key="barrModYP")
+        self.barrYMComp = CachedValueWeighter(key="barrModYM")
+        self.barrZPComp = CachedValueWeighter(key="barrModZP")
+        self.barrZMComp = CachedValueWeighter(key="barrModZM")
 
-        self.neuaneu_w = AntiparticleWeighter(params["NeutrinoAntineutrinoRatio"])
+        self.neuaneu_w = AntiparticleWeighter(balance=params["NeutrinoAntineutrinoRatio"])
 
         self.aduw = AtmosphericUncertaintyWeighter(self._atmosphericDensityUncertaintySpline, params["zenithCorrection"])
         self.kluw = AtmosphericUncertaintyWeighter(self._kaonLossesUncertaintySpline, params["kaonLosses"])
@@ -201,26 +198,26 @@ class SimWeighter:
 
         # some of these need to be reconfigured 
 
-        self.neuaneu_w.configure(balance = params["NeutrinoAntineutrinoRatio"])
+        self.neuaneu_w.configure([params["NeutrinoAntineutrinoRatio"]])
 
-        self.aduw.configure(scale = params["zenithCorrection"])
-        self.kluw.configure(scale = params["kaonLosses"])
+        self.aduw.configure([params["zenithCorrection"]])
+        self.kluw.configure([params["kaonLosses"]])
 
-        self.conv_nu_att_weighter.configure( scale_nu= params["nuxs"], scale_nubar=params["nubarxs"] )
-        self.prompt_nu_att_weighter.configure( scale_nu= params["nuxs"], scale_nubar=params["nubarxs"] )
-        self.astro_nu_att_weighter.configure( scale_nu= params["nuxs"], scale_nubar=params["nubarxs"] )
+        self.conv_nu_att_weighter.configure([ params["nuxs"], params["nubarxs"]])
+        self.prompt_nu_att_weighter.configure([ params["nuxs"], params["nubarxs"]])
+        self.astro_nu_att_weighter.configure([ params["nuxs"], params["nubarxs"]])
 
-        self.convDOMEff.configure(scale_factor= params["domEfficiency"])
-        self.promptDOMEff.configure(scale_factor= params["domEfficiency"])
-        self.astroNuMuDOMEff.configure(scale_factor= params["domEfficiency"])
+        self.convDOMEff.configure([params["domEfficiency"]])
+        self.promptDOMEff.configure([ params["domEfficiency"]])
+        self.astroNuMuDOMEff.configure([params["domEfficiency"]])
 
-        self.convHoleIceWeighter.configure(scale_factor= params["holeiceForward"])
-        self.promptHoleIceWeighter.configure(scale_factor= params["holeiceForward"])
-        self.astroNuMuHoleIceWeighter.configure(scale_factor= params["holeiceForward"])
+        self.convHoleIceWeighter.configure([params["holeiceForward"]])
+        self.promptHoleIceWeighter.configure([params["holeiceForward"]])
+        self.astroNuMuHoleIceWeighter.configure([ params["holeiceForward"]])
 
-        self.ice_grad_0.configure( scale= params["icegrad0"])
-        self.ice_grad_1.configure( scale= params["icegrad1"])
+        self.ice_grad_0.configure([params["icegrad0"]])
+        self.ice_grad_1.configure([params["icegrad1"]])
 
-        self.conv_flux_weighter.configure(deltaIndex = params["CRDeltaGamma"])
-        self.prompt_flux_weighter.configure(deltaIndex = params["CRDeltaGamma"])
-        self.astro_flux_weigter.configure(deltaIndex = params["astroDeltaGamma"])
+        self.conv_flux_weighter.configure([params["CRDeltaGamma"]])
+        self.prompt_flux_weighter.configure([params["CRDeltaGamma"]])
+        self.astro_flux_weigter.configure([params["astroDeltaGamma"]])

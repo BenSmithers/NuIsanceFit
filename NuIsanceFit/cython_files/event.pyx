@@ -4,7 +4,7 @@ from libcpp cimport bool
 Here, we describe the Event classes and methods for interacting with the events 
 """
 
-cdef dict EventCache(float cache_weight, float livetime):
+def EventCache(float cache_weight, float livetime):
     """
     This object is used to cache various properties used during the Weighting 
 
@@ -59,7 +59,7 @@ cdef class Event:
 
         Considering later adding a **kwargs and parsing those individually. (check for name, pass to setBLAH function)
         """
-        self.is_mc = False
+        self._is_mc = False
 
         self._primaryEnergy = 0.0
         self._logPrimaryEnergy = 0.0
@@ -167,8 +167,13 @@ cdef class Event:
         self._finalType0 = value
     def setFinalType1(self,int value):
         self._finalType1 = value
+    def setIsMC(self, bint value):
+        self._is_mc = value
     # =================== The Getters
     # they get parameters. 
+    @property
+    def is_mc(self):
+        return self._is_mc
     @property
     def rawPrimaryZenith(self):
         return self._rawPrimaryZenith
