@@ -250,6 +250,8 @@ class ParamPoint:
         else:
             Logger.Fatal("Object does not have attribute {}".format(key),KeyError)
 
+    def as_dict(self):
+        return self.values
 
 class PriorSet:
     def __init__(self):
