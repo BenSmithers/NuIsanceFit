@@ -240,7 +240,7 @@ class Data:
             new_event.setYear( 0 ) #TODO change this when you want to bin in time 
 
             if is_mc:
-                new_event.is_mc = True
+                new_event.setIsMC(True)
                 new_event.setPrimaryEnergy(  _e_true[i_event][5] )
                 new_event.setPrimaryAzimuth( _a_true[i_event][5] )
                 new_event.setRawZenith( _z_true[i_event][5] ) 

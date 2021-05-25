@@ -1,11 +1,12 @@
 from NuIsanceFit.param import ParamPoint, params as global_params
 from NuIsanceFit.logger import Logger 
 
-import photospline as ps
 import os 
 import numpy as np
 from glob import glob # finding the attenuation splines
-from NuIsanceFit.weighting import * 
+from NuIsanceFit.weighting import CachedValueWeighter, PowerLawTiltWeighter, AntiparticleWeighter
+from NuIsanceFit.weighting import AtmosphericUncertaintyWeighter, TopoWeighter, AttenuationWeighter, IceGradientWeighter
+from NuIsanceFit.weighting import SplineTable, FluxComponent
 """
 Here we design and implement classes to Weight events
 
@@ -68,7 +69,7 @@ def fill_fluxcomp_dict(folder):
             ret_dict[fluxComponent] = {}
 
         # load in the spline 
-        ret_dict[fluxComponent][pid] = ps.SplineTable(item)
+        ret_dict[fluxComponent][pid] = SplineTable(item)
 
     return ret_dict
 
@@ -93,9 +94,9 @@ class SimWeighter:
 
         Logger.Log("Loading in splines for Weighting")
         Logger.Trace("    {}".format(resources["atmospheric_density_spline"]))
-        self._atmosphericDensityUncertaintySpline = ps.SplineTable(resources["atmospheric_density_spline"])
+        self._atmosphericDensityUncertaintySpline = SplineTable(resources["atmospheric_density_spline"])
         Logger.Trace("    {}".format(resources["atmospheric_kaonlosses_spline"]))
-        self._kaonLossesUncertaintySpline = ps.SplineTable(resources["atmospheric_kaonlosses_spline"])
+        self._kaonLossesUncertaintySpline = SplineTable(resources["atmospheric_kaonlosses_spline"])
 
         self._attenuationSplineDict = fill_fluxcomp_dict(resources["attenuation_splines"])
         self._domSplines = fill_fluxcomp_dict(resources["dom_splines"])
@@ -139,34 +140,34 @@ class SimWeighter:
 
         self.neuaneu_w = AntiparticleWeighter(balance=params["NeutrinoAntineutrinoRatio"])
 
-        self.aduw = AtmosphericUncertaintyWeighter(self._atmosphericDensityUncertaintySpline, params["zenithCorrection"])
-        self.kluw = AtmosphericUncertaintyWeighter(self._kaonLossesUncertaintySpline, params["kaonLosses"])
+        self.aduw = AtmosphericUncertaintyWeighter(spline = self._atmosphericDensityUncertaintySpline, scale= params["zenithCorrection"])
+        self.kluw = AtmosphericUncertaintyWeighter(spline = self._kaonLossesUncertaintySpline,scale= params["kaonLosses"])
 
-        self.conv_nu_att_weighter = AttenuationWeighter(self._attenuationSplineDict, FluxComponent.atmConv, params["nuxs"], params["nubarxs"], dtype)
-        self.prompt_nu_att_weighter = AttenuationWeighter(self._attenuationSplineDict, FluxComponent.atmPrompt, params["nuxs"], params["nubarxs"], dtype)
-        self.astro_nu_att_weighter = AttenuationWeighter(self._attenuationSplineDict, FluxComponent.diffuseAstro_mu, params["nuxs"], params["nubarxs"], dtype)
+        self.conv_nu_att_weighter = AttenuationWeighter(spline_map = self._attenuationSplineDict, fluxComp=FluxComponent.atmConv, scale_nu=params["nuxs"], scale_nubar=params["nubarxs"])
+        self.prompt_nu_att_weighter = AttenuationWeighter(spline_map=self._attenuationSplineDict, fluxComp=FluxComponent.atmPrompt, scale_nu= params["nuxs"],scale_nubar= params["nubarxs"])
+        self.astro_nu_att_weighter = AttenuationWeighter(spline_map=self._attenuationSplineDict, fluxComp=FluxComponent.diffuseAstro_mu, scale_nu=params["nuxs"],scale_nubar= params["nubarxs"])
 
-        self.convDOMEff = TopoWeighter(self._domSplines, FluxComponent.atmConv, params["domEfficiency"], dtype)
-        self.promptDOMEff = TopoWeighter(self._domSplines, FluxComponent.atmPrompt, params["domEfficiency"], dtype)
-        self.astroNuMuDOMEff = TopoWeighter(self._domSplines, FluxComponent.diffuseAstro_mu, params["domEfficiency"], dtype)
+        self.convDOMEff = TopoWeighter(spline_map=self._domSplines,fluxComp= FluxComponent.atmConv,scale_factor= params["domEfficiency"])
+        self.promptDOMEff = TopoWeighter(spline_map=self._domSplines,fluxComp= FluxComponent.atmPrompt,scale_factor= params["domEfficiency"])
+        self.astroNuMuDOMEff = TopoWeighter(spline_map=self._domSplines,fluxComp= FluxComponent.diffuseAstro_mu,scale_factor= params["domEfficiency"])
 
         # these aren't actually used. 
         #hqconvDOMEff = TopoWeighter(self._hqdomSplines, FluxComponent.atmConv, params["hqdomEffficiency"],dtype)
         #hqpromptDOMEff = TopoWeighter(self._hqdomSplines, FluxComponent.atmPrompt, params["hqdomEffficiency"],dtype)
 
-        self.convHoleIceWeighter = TopoWeighter(self._holeiceSplines, FluxComponent.atmConv, params["holeiceForward"], dtype)
-        self.promptHoleIceWeighter = TopoWeighter(self._holeiceSplines, FluxComponent.atmPrompt, params["holeiceForward"], dtype)
-        self.astroNuMuHoleIceWeighter = TopoWeighter(self._holeiceSplines, FluxComponent.diffuseAstro_mu, params["holeiceForward"], dtype)
+        self.convHoleIceWeighter = TopoWeighter(spline_map=self._holeiceSplines,fluxComp= FluxComponent.atmConv,scale_factor= params["holeiceForward"])
+        self.promptHoleIceWeighter = TopoWeighter(spline_map=self._holeiceSplines, fluxComp=FluxComponent.atmPrompt,scale_factor= params["holeiceForward"])
+        self.astroNuMuHoleIceWeighter = TopoWeighter(spline_map=self._holeiceSplines,fluxComp= FluxComponent.diffuseAstro_mu,scale_factor= params["holeiceForward"])
 
         edges, values = self._extract_edges_values(self._ice_grad_data[0])
-        self.ice_grad_0 = IceGradientWeighter(edges, values, params["icegrad0"], dtype)
+        self.ice_grad_0 = IceGradientWeighter(bin_edges=edges,gradient= values,scale= params["icegrad0"])
 
         edges, values = self._extract_edges_values(self._ice_grad_data[1])
-        self.ice_grad_1 = IceGradientWeighter(edges, values, params["icegrad1"], dtype)
+        self.ice_grad_1 = IceGradientWeighter(bin_edges=edges,gradient= values,scale= params["icegrad1"])
 
-        self.conv_flux_weighter = PowerLawTiltWeighter(self.medianConvEnergy, params["CRDeltaGamma"])
-        self.prompt_flux_weighter = PowerLawTiltWeighter(self.medianPromptEnergy, self.params["CRDeltaGamma"])
-        self.astro_flux_weigter = PowerLawTiltWeighter(self.astroPivotEnergy, self.params["astroDeltaGamma"])
+        self.conv_flux_weighter = PowerLawTiltWeighter(medianEnergy=self.medianConvEnergy, deltaIndex=params["CRDeltaGamma"])
+        self.prompt_flux_weighter = PowerLawTiltWeighter(medianEnergy=self.medianPromptEnergy, deltaIndex=params["CRDeltaGamma"])
+        self.astro_flux_weigter = PowerLawTiltWeighter(medianEnergy=self.astroPivotEnergy, deltaIndex=params["astroDeltaGamma"])
 
 
     def __call__(self, event): 
@@ -191,7 +192,7 @@ class SimWeighter:
     def _extract_edges_values(self, entry):
         edges = np.append(entry[0], entry[1][-1])
         values= entry[1]
-        return edges, values
+        return list(edges), list(values)
 
     def configure(self, params, dtype=float):
         self.params = params

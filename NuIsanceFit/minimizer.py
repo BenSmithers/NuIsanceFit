@@ -12,9 +12,8 @@ SAYLikelihood
 
 from NuIsanceFit.param import ParamPoint, PriorSet
 from NuIsanceFit.logger import Logger 
-from NuIsanceFit.weighter import Weighter
 from NuIsanceFit.weighter import SimWeighter
-from NuIsanceFit.weighter import SimpleDataWeighter 
+from NuIsanceFit.weighting import SimpleDataWeighter 
 from NuIsanceFit.histogram import bHist, eventBin, flatten, transpose
 from NuIsanceFit.nuthread import ThreadManager
 from NuIsanceFit.event import Event

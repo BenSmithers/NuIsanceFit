@@ -1,7 +1,7 @@
-cdef dict EventCache(float, float)
+## cdef dict EventCache(float, float)
 
 cdef class Event:
-    cdef readonly bint is_mc
+    cdef readonly bint _is_mc
     cdef readonly float _primaryEnergy
     cdef readonly float _logPrimaryEnergy
     cdef readonly float _primaryAzimuth
