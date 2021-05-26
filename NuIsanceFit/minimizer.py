@@ -225,7 +225,7 @@ class llhMachine:
         """
         Logger.Trace("Making sim/data Weighters")
         self._dataWeighter = SimpleDataWeighter()
-        self._simWeighter.configure(params)
+        self._simWeighter.configure(params.as_dict())
  
         # If this is outside our valid parameter space, BAIL OUT
         prior_param = self.prior(params)

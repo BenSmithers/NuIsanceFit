@@ -20,7 +20,7 @@ class Fitter:
         if not isinstance(params, ParamPoint):
             Logger.Fatal("Arg 'param' must be {}, not {}".format(ParamPoint, type(params)))
 
-        self._llhobj._simWeighter.configure(params)
+        self._llhobj._simWeighter.configure(params.as_dict())
 
 
         sim = self._data.simulation
@@ -32,11 +32,24 @@ class Fitter:
         
         #def getter
 
+
+        def wrapper(dataobj):
+            result = [0 for i in range(dims[1])]
+            for j in range(dims[1]):
+                for event in dataobj[j][0][0][0]:
+                    result[j] += self._llhobj._simWeighter(event)
+            return result
+
+        
         for i in range(dims[0]):
             for j in range(dims[1]):
                 # let's just fix the other dimensions for now! 
                 for event in sim[i][j][0][0][0]:
                     result[i][j]+=self._llhobj._simWeighter(event)
+        
+
+        #result = ThreadManager(wrapper, sim.fill)
+
 
         return result
 

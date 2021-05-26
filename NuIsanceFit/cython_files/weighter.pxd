@@ -19,6 +19,7 @@ cpdef enum FluxComponent:
 
 cdef class SplineTable:
     cdef readonly object table
+    cpdef float evalSpline(self, tuple coords)
 
 cdef class PowerLawTiltWeighter(Weighter):
     cdef readonly float medianEnergy
