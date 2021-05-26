@@ -24,6 +24,48 @@ Calculate a likelihood (LLH) for this set of nuisance parameters according to th
 Calculate the LLHs for multiple different fluxes (different physics?)
 Find the most likely one 
 
+# Installing
+
+## **PYTHON 2 Will Never Be Supported**
+
+## Dependencies 
+
+### Python 
+
+You need to use Python 3. 
+The rest of these are also now (or will soon be) necessary.
+ - numpy
+ - scipy
+ - pytorch 
+ - matplotlib 
+
+### C++ dependencies:
+ - Photospline (with python bindings)
+ - SQuIDS (for nuSQuIDS)
+ - nuSQuIDS and nuSQuIDSpy
+ - LeptonWeighter (with python bindings) 
+
+When in installing the squids and LW, remember to set your `LD_LIBRARY_PATH`.
+Forgetting to do this can lead to frustrating symbol errors with mangled names. 
+
+## Cython 
+
+Some parts of this code are written in *cython*.
+This is done to optimize the time it takes to run some of the more crunchy parts.
+As a consequence, there's a short little installation process before you can actually use the code. 
+First, set up the environment in your bashrc or bash profile (your call)
+```
+export PYTHONPATH=$PYTHONPATH:/path/to/here
+```
+Next, install cython.
+The process will depend on your package manager; with apt it's as easy as 
+```
+sudo apt-get install cython3
+```
+Then, navigate to `/path/to/here/NuIsanceFit/cython_files/`, and run the bash script `cython_build.sh`. 
+It will call `python3` and tell it to prepare the cython.
+
+
 # Contributing:
 
 Check out the workboard in the Projects tab! As I do more work here, I'll keep adding more projects there. 
@@ -78,15 +120,4 @@ so things don't get set to an unexpected value. This ensures we run into the pro
 
 Also, use inheritance when appropriate (see: `weighter.py`) 
 
-### Dependencies
 
-Try to avoid using bloated uncommon dependencies except where necessary. Numpy, scipy, pytorch and matplotlib should have everything we'll need! If there are other dependencies not present in a standard python installation, add them below. 
-
-Other dependencies:
- - Photospline 
- - SQuIDS (for nuSQuIDS)
- - nuSQuIDSpy
- - LeptonWeighter
- - nuflux (for LW, use `pip3 install --user git+https://github.com/icecube/nuflux`)
-
-When in installing the squids and LW, remember to set your `LD_LIBRARY_PATH`
