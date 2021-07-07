@@ -162,12 +162,14 @@ class llhMachine:
         sim = pairs[1]
         assert(len(obs)==len(sim))
 
+
         for i in range(len(obs)):
             # these are bin objects, they have events 
             this_obs = obs[i] 
             this_sim = sim[i]
 
-            
+            if len(this_sim)==0: # no expectation
+                continue
 
             # get total weight of events oveserved in this bin
             observationAmount = sum([self._dataWeighter(event) for event in this_obs])
