@@ -235,6 +235,25 @@ cdef class Event:
     def cachedWeight(self):
         return self._cachedweight
 
+    # ========================= Special C-Level Access Functions =====
+    cdef float getPrimaryEnergy(self):
+        return self._primaryEnergy
+    cdef float getLogPrimaryEnergy(self):
+        return self._logPrimaryEnergy
+    cdef float getPrimaryZenith(self):
+        return self._primaryZenith
+    cdef float getEnergy(self):
+        return self._energy
+    cdef float getLogEnergy(self):
+        return self._logEnergy
+    cdef int getPrimaryType(self):
+        return self._primaryType
+    cdef dict getCache(self):
+        return self._cachedweight
+    cdef int getTopology(self):
+        return self._topology
+    
+
     # ========================= Utilities ============================
     def _get_meta_weight(self):
         return self._cachedweight["convWeight"] + self._cachedweight["promptWeight"] + self._cachedweight["astroMuWeight"]

@@ -1,25 +1,32 @@
 from event cimport Event 
 
+cpdef enum FluxComponent:
+    atmConv = 0,
+    atmPrompt = 1,
+    atmMuon = 2,
+    diffuseAstro = 3,
+    diffuseAstro_e = 4,
+    diffuseAstro_mu = 5,
+    diffuseAstro_tau = 6,
+    diffuseAstroSec = 7,
+    gzk = 8
+
+"""
+cdef extern from "<photospline>" namespace "photospline":
+    cdef cppclass splinetable[Alloc=*]:
+        ctypedef Alloc allocator_type
+        splinetable() except + 
+        splinetable(str) except +
+        float operator()(tuple)
+"""
+
+# from photospline import splinetable
+
 cdef class Weighter:
     cpdef float evalEvt(self, Event event)
 
 cdef class SimpleDataWeighter(Weighter):
     pass
-
-cpdef enum FluxComponent:
-    atmConv = 0
-    atmPrompt = 1
-    atmMuon = 2
-    diffuseAstro = 3
-    diffuseAstro_e = 4
-    diffuseAstro_mu = 5
-    diffuseAstro_tau = 6
-    diffuseAstroSec = 7
-    gzk = 8
-
-cdef class SplineTable:
-    cdef readonly object table
-    cpdef float evalSpline(self, tuple coords)
 
 cdef class PowerLawTiltWeighter(Weighter):
     cdef readonly float medianEnergy
@@ -35,7 +42,7 @@ cdef class CachedValueWeighter(Weighter):
     cdef readonly str key
 
 cdef class SplineWeighter(Weighter):
-    cdef readonly SplineTable _spline
+    cdef readonly object _spline
 
 cdef class AtmosphericUncertaintyWeighter(SplineWeighter):
     cdef readonly float _scale
@@ -62,8 +69,8 @@ cdef class SimWeighter:
     cdef readonly float medianPromptEnergy 
     cdef readonly float astroPivotEnergy
 
-    cdef readonly SplineTable _atmosphericDensityUncertaintySpline 
-    cdef readonly SplineTable _kaonLossesUncertaintySpline 
+    #cdef readonly SplineTable _atmosphericDensityUncertaintySpline 
+    #cdef readonly SplineTable _kaonLossesUncertaintySpline 
 
     cdef readonly dict _attenuationSplineDict 
     cdef readonly dict _domSplines 

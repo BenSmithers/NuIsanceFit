@@ -4,9 +4,10 @@ from event cimport Event
 from event import EventCache
 #from photospline import SplineTable
 from libc.math cimport isnan
+from libc.math cimport pow as cpow
 
-import photospline as ps
-
+#import photospline as ps
+#
 cimport numpy as np
 import numpy as np
 
@@ -15,11 +16,8 @@ from glob import glob
 
 from NuIsanceFit.param import ParamPoint
 
-cdef class SplineTable:
-    def __cinit__(self, str filepath):
-        self.table = ps.SplineTable(filepath)
-    cpdef float evalSpline(self, tuple coords):
-        return self.table(coords)
+from photospline import SplineTable
+
 
 cdef int get_lower(float x, list domain):
     """
@@ -75,9 +73,9 @@ cdef class PowerLawTiltWeighter(Weighter):
         self.deltaIndex = params[0]
     
     cpdef float evalEvt(self, Event event):
-        if event.primaryEnergy<=0:
-            raise ValueError("Cannot weight event with negative energy: {}".format(event.primaryEnergy))
-        return pow(event.primaryEnergy/self.medianEnergy, self.deltaIndex)
+        if event.getPrimaryEnergy()<=0.0:
+            raise ValueError("Cannot weight event with negative energy: {}".format(event.getPrimaryEnergy()))
+        return (event.getPrimaryEnergy()/self.medianEnergy)**self.deltaIndex
 
 cdef class SimpleDataWeighter(Weighter):
     def __cinit__(self, **kwargs):
@@ -91,7 +89,7 @@ cdef class AntiparticleWeighter(Weighter):
     def configure(self, list params):
         self.balance = params[0]
     cpdef float evalEvt(self, Event event):
-        return( self.balance if event.primaryType<0 else 2-self.balance)
+        return( self.balance if event.getPrimaryType()<0 else 2-self.balance)
 
 cdef class CachedValueWeighter(Weighter):
     """
@@ -104,17 +102,17 @@ cdef class CachedValueWeighter(Weighter):
         self.key = key
 
     cpdef float evalEvt(self,Event event):
-        return event.cachedWeight[self.key]
+        return event.getCache()[self.key]
 
 cdef class SplineWeighter(Weighter):
     """
     Generic spliney Weighter. I'm using this as an intermediate so I don't have to keep writing out the spline check
     """
-    def __cinit__(self, SplineTable spline, **kwargs):
+    def __cinit__(self, object spline, **kwargs):
         self._spline = spline
 
     cpdef float evalEvt(self,Event event):
-        return self._spline.evalSpline((event.logPrimaryEnergy, event.primaryZenith)) #note: we already keep the event zenith in cosTh space 
+        return self._spline((event.getLogPrimaryEnergy(), event.getPrimaryZenith())) #note: we already keep the event zenith in cosTh space 
 
 cdef class AtmosphericUncertaintyWeighter(SplineWeighter):
     """
@@ -122,7 +120,7 @@ cdef class AtmosphericUncertaintyWeighter(SplineWeighter):
 
     Seriously, look in GF. Those both are exactly identical functions. I don't get it 
     """
-    def __cinit__(self, SplineTable spline, float scale, **kwargs):
+    def __cinit__(self, object spline, float scale, **kwargs):
         self._scale = scale 
     def configure(self,list params):
         self._scale = params[0]
@@ -164,29 +162,29 @@ cdef class TopoWeighter(FluxCompWeighter):
 
     cpdef float evalEvt(self,Event event):
         if self.fluxComp == FluxComponent.atmConv:
-            cache = event.cachedWeight["domEffConv"]
+            cache = event.getCache()["domEffConv"]
         elif self.fluxComp == FluxComponent.atmPrompt:
-            cache = event.cachedWeight["domEffPrompt"]
+            cache = event.getCache()["domEffPrompt"]
         elif self.fluxComp == FluxComponent.diffuseAstro_mu:
-            cache = event.cachedWeight["domEffAstro"]
+            cache = event.getCache()["domEffAstro"]
         else:
             raise NotImplementedError("Should be unreachable")
 
         cdef str access_topo = ""
-        if event._topology == 0:
+        if event.getTopology() == 0:
             access_topo = "track"
-        elif event._topology == 1:
+        elif event.getTopology() == 1:
             access_topo = "cascade"
         else:
-            raise ValueError("Unsupported track topology for the topology weighter! {}".format(event._topology))
+            raise ValueError("Unsupported track topology for the topology weighter! {}".format(event.getTopology()))
 
-        cdef float correction = self.spline_map[self.fluxComp][access_topo].evalSpline((event.logPrimaryEnergy, event.zenith  , self.scale_factor))
+        cdef float correction = self.spline_map[self.fluxComp][access_topo]((event.getLogPrimaryEnergy(), event.getPrimaryZenith()  , self.scale_factor))
         
         if isnan(correction):
             # This is a cow? We just ignore cows? 
             return 0.0
         else: 
-            return 10**(correction - cache) 
+            return 10**(correction - cache)
 
 cdef class AttenuationWeighter(FluxCompWeighter):
     def __cinit__(self,dict spline_map,FluxComponent fluxComp,float scale_nu,float scale_nubar):
@@ -200,12 +198,12 @@ cdef class AttenuationWeighter(FluxCompWeighter):
     cpdef float evalEvt(self,Event event):
         cdef float scale
 
-        if event.primaryType>0:
+        if event._primaryType>0:
             scale = self.scale_nu
         else:
             scale = self.scale_nubar
         
-        cdef float correction = self.spline_map[self.fluxComp][event.primaryType].evalSpline((event.logPrimaryEnergy, event.primaryZenith, scale))
+        cdef float correction = self.spline_map[self.fluxComp][event.getPrimaryType()]((event.getLogPrimaryEnergy(), event.getPrimaryZenith(), scale))
 
         if correction < 0:
             raise ValueError("Weighter returned negative weight {}!".format(correction))
@@ -224,7 +222,7 @@ cdef class IceGradientWeighter(Weighter):
         self._scale = params[0]
 
     cpdef float evalEvt(self, Event event):
-        cdef int gradbin = get_lower(event.logEnergy, self._bin_edges)
+        cdef int gradbin = get_lower(event.getLogEnergy(), self._bin_edges)
 
         if gradbin == -1:
             return 1.0
@@ -313,8 +311,8 @@ cdef class SimWeighter:
         self.medianPromptEnergy = steering["fixed_params"]["medianPromptEnergy"]
         self.astroPivotEnergy = steering["fixed_params"]["astroPivotEnergy"]
 
-        self._atmosphericDensityUncertaintySpline = SplineTable(resources["atmospheric_density_spline"])
-        self._kaonLossesUncertaintySpline = SplineTable(resources["atmospheric_kaonlosses_spline"])
+        _atmosphericDensityUncertaintySpline = SplineTable(resources["atmospheric_density_spline"])
+        _kaonLossesUncertaintySpline = SplineTable(resources["atmospheric_kaonlosses_spline"])
 
         self._attenuationSplineDict = fill_fluxcomp_dict(resources["attenuation_splines"])
         self._domSplines = fill_fluxcomp_dict(resources["dom_splines"])
@@ -349,8 +347,8 @@ cdef class SimWeighter:
 
         self.neuaneu_w = AntiparticleWeighter(balance=params["NeutrinoAntineutrinoRatio"])
 
-        self.aduw = AtmosphericUncertaintyWeighter(spline = self._atmosphericDensityUncertaintySpline, scale= params["zenithCorrection"])
-        self.kluw = AtmosphericUncertaintyWeighter(spline = self._kaonLossesUncertaintySpline,scale= params["kaonLosses"])
+        self.aduw = AtmosphericUncertaintyWeighter(spline = _atmosphericDensityUncertaintySpline, scale= params["zenithCorrection"])
+        self.kluw = AtmosphericUncertaintyWeighter(spline = _kaonLossesUncertaintySpline,scale= params["kaonLosses"])
 
         self.conv_nu_att_weighter = AttenuationWeighter(spline_map = self._attenuationSplineDict, fluxComp=FluxComponent.atmConv, scale_nu=params["nuxs"], scale_nubar=params["nubarxs"])
         self.prompt_nu_att_weighter = AttenuationWeighter(spline_map=self._attenuationSplineDict, fluxComp=FluxComponent.atmPrompt, scale_nu= params["nuxs"],scale_nubar= params["nubarxs"])

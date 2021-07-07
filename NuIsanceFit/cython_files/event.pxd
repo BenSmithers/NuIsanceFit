@@ -6,7 +6,7 @@ cdef class Event:
     cdef readonly float _logPrimaryEnergy
     cdef readonly float _primaryAzimuth
     cdef readonly float _primaryZenith
-    cdef readonly float _primaryType
+    cdef readonly int _primaryType
     cdef readonly float _rawPrimaryZenith
     cdef readonly int _finalType0
     cdef readonly int _finalType1
@@ -23,3 +23,13 @@ cdef class Event:
     cdef readonly int _topology
     cdef readonly int _year
     cdef readonly dict _cachedweight
+
+    # we want some c-level access functions that avoid the python stack!
+    cdef float getPrimaryEnergy(self)
+    cdef float getLogPrimaryEnergy(self)
+    cdef float getPrimaryZenith(self)
+    cdef float getEnergy(self)
+    cdef float getLogEnergy(self)
+    cdef int getPrimaryType(self)
+    cdef dict getCache(self)
+    cdef int getTopology(self)
