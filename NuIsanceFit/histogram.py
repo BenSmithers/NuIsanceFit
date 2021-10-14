@@ -22,6 +22,9 @@ def sci(number, precision=4):
     return("{0:.{1}f}".format(number/(10**power), precision)+"e{}".format( power))
 
 class eventBin:
+    """
+    Used closely with the bHist and acts like a list. Adding two together combine them into a new one. Adding an Event to this contatenates the thing. 
+    """
     def __init__(self):
         self._contains = deque()
 
@@ -70,7 +73,7 @@ def build_arbitrary_list(dims, dtype):
         dtype() needs to work
 
 
-    It's recursive, which I don't like. But it works pretty well!
+    It's recursive, which I don't like. But it works pretty well! It's also a little better since the recursion should never go more than 5-6 levels deep for what we're doing
     """
     if not isinstance(dims, (list,tuple,np.ndarray)):
         Logger.Fatal("Need iterable dims! Got {}".format(type(dims)), TypeError)
@@ -216,7 +219,7 @@ def flatten(bhist):
 
 def transpose(obj):
     """
-    Takes a 2D array and transposes it 
+    Takes a 2D list and transposes it 
     """
     return list(zip(*obj))
 

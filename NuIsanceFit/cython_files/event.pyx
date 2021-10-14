@@ -1,5 +1,6 @@
 from libc.math cimport pi, cos, log10
 from libcpp cimport bool
+from numbers import Number
 """
 Here, we describe the Event classes and methods for interacting with the events 
 """
@@ -83,6 +84,8 @@ cdef class Event:
         self._azimuth = 0.0
 
         self._sample = 0 # SampleTag.CASCADE
+
+        self._snowstorm_params = [0.,0.,0.,0.,0.,0.] 
        
         # 0 is track, 1 is cascade
         self._topology = 0
@@ -96,6 +99,13 @@ cdef class Event:
 
     All of these work the same exact way, and just set some parameter. 
     """
+    def setSnowStormParams(self, list what):
+        if not len(what)>0:
+            raise ValueError("Expected at least one snowstorm param, got {}".format(what))
+        if not all( isinstance(entry, Number) for entry in what ):
+            raise TypeError("Found non-number in {}".format(what))
+        self._snowstorm_params = [ entry for entry in what ] # explicitly copy it  
+
     def setCache(self, dict which):
         self._cachedweight = which
     def setPrimaryType(self, int which):
@@ -234,6 +244,9 @@ cdef class Event:
     @property 
     def cachedWeight(self):
         return self._cachedweight
+    @property 
+    def snowStormParams(self):
+        return self._snowstorm_params 
 
     # ========================= Special C-Level Access Functions =====
     cdef float getPrimaryEnergy(self):

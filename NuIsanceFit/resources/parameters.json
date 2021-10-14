@@ -14,39 +14,14 @@
         "center":0.0,
         "width":0.01
     },
-    "CRDeltaGammaSec":{
-        "fit":true,
-        "center":0.0,
-        "width":0.01
-    },
     "zenithCorrection":{
         "fit":true,
         "center":0.0,
         "width":1.0
     },
-    "muonNorm":{
-        "fit":true,
-        "center":1.0,
-        "width":0.5
-    },
     "astroNorm":{
         "fit":true,
-        "center":2.66666666667,
-        "width":-1
-    },
-    "astroFlavorAngle1":{
-        "fit":false,
-        "center":0.4444444444,
-        "width":-1
-    },
-    "astroFlavorAngle2":{
-        "fit":false,
-        "center":0.0,
-        "width":-1
-    },
-    "astroParticleBalance":{
-        "fit":false,
-        "center":1.0,
+        "center":2.5,
         "width":-1
     },
     "astroDeltaGamma":{
@@ -54,65 +29,25 @@
         "center":0.0,
         "width":-1
     },
-    "astro1Comp2DNorm":{
-        "fit":false,
-        "center":0.786666666,
-        "width":0.36
-    },
-    "astro1Comp2DDeltaGamma":{
-        "fit":false,
-        "center":0.00,
-        "width":0.36
-    },
-    "cutoffEnergy":{
-        "fit":false,
-        "center":1.0,
-        "width":0.4
-    },
-    "piKRatio":{
-        "fit":true,
-        "center":1.0,
-        "width":0.1
-    },
     "NeutrinoAntineutrinoRatio":{
         "fit":true,
         "center":1.0,
         "width":0.1
-    },
-    "darkNorm":{
-        "fit":false,
-        "center":1.0,
-        "width":-1
     },
     "domEfficiency":{
         "fit":true,
         "center":1.27,
         "width":100.0
     },
-    "hqdomEffficiency":{
+    "piKRatio":{
         "fit":true,
-        "center":1.35,
-        "width":100.0
+        "center":1.0,
+        "width":0.1
     },
     "holeiceForward":{
         "fit":true,
         "center":0.0,
         "width":0.5
-    },
-    "anisotropyScale":{
-        "fit":false,
-        "center":1.0,
-        "width":0.2
-    },
-    "GZKNorm":{
-        "fit":false,
-        "center":0.0,
-        "width":-1
-    },
-    "astroSigma":{
-        "fit":true,
-        "center":0.5,
-        "width":-1
     },
     "barrWP":{
         "fit":true,
@@ -154,20 +89,6 @@
         "center":0.0,
         "width":0.12,
         "min":-0.25,
-        "max":0.5
-    },
-    "barrHP":{
-        "fit":false,
-        "center":0.0,
-        "width":0.15,
-        "min":-0.5,
-        "max":0.5
-    },
-    "barrHM":{
-        "fit":false,
-        "center":0.0,
-        "width":0.15,
-        "min":-0.5,
         "max":0.5
     },
     "icegrad0":{

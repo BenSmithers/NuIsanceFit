@@ -1,3 +1,4 @@
+from numba.cuda import target
 from NuIsanceFit import Logger
 from NuIsanceFit.histogram import bHist, eventBin
 from NuIsanceFit.event import Event, EventCache
@@ -7,7 +8,7 @@ from numbers import Number
 import numpy as np
 import h5py as h5
 import os
-from math import log10, cos
+from math import log10, cos, sqrt, pi
 from glob import glob
 
 try:
@@ -18,6 +19,9 @@ except ImportError:
     import nuSQuIDSpy as nsq
 
 import LeptonWeighter as LW
+
+def temporary_fluxfunc(energy):
+    return (1e-18)*( energy/(100e3) )**-2.2
 
 def make_edges(bin_params, key):
     """
@@ -89,27 +93,133 @@ class Data:
         self.simulation = bHist([ self._Eedges, self._cosThEdges, self._azimuthEdges, self._topoEdges, self._timeEdges ], bintype=eventBin,datatype=Event)
         self.data = bHist([ self._Eedges, self._cosThEdges, self._azimuthEdges, self._topoEdges, self._timeEdges ], bintype=eventBin,datatype=Event)
 
+
         # ================================ Prepare some weighting stuff for building the event caches 
+        have_lic_files = True
         self._lic_files = []
         for entry in self._simToLoad:
+            if "lic_file" not in self._simToLoad[entry]:
+                have_lic_files = False
+                break
             name = os.path.join(steering["datadir"],self._simToLoad[entry]["lic_file"])
             self._lic_files += LW.MakeGeneratorsFromLICFile(name)
-        self._xs_obj = LW.CrossSectionFromSpline(self.steering["resources"]["diff_nu_cc_xs"], self.steering["resources"]["diff_nubar_cc_xs"],
-                                                    self.steering["resources"]["diff_nu_nc_xs"], self.steering["resources"]["diff_nubar_nc_xs"])
-        # TODO: toggleable single/double atmo file 
-        self._convFluxWeighter =   LW.Weighter(LW.nuSQUIDSAtmFlux(self.steering["resources"]["conv_atmo_flux"]),self._xs_obj, self._lic_files)
-        self._promptFluxWeighter = LW.Weighter(LW.nuSQUIDSAtmFlux(self.steering["resources"]["prompt_atmo_flux"]),self._xs_obj, self._lic_files)
-        self._astroFluxWeighter =  LW.Weighter(LW.nuSQUIDSAtmFlux(self.steering["resources"]["astro_file"]),self._xs_obj, self._lic_files)
+
+        if have_lic_files:
+            self._xs_obj = LW.CrossSectionFromSpline(self.steering["resources"]["diff_nu_cc_xs"], self.steering["resources"]["diff_nubar_cc_xs"],
+                                                        self.steering["resources"]["diff_nu_nc_xs"], self.steering["resources"]["diff_nubar_nc_xs"])
+            # TODO: toggleable single/double atmo file 
+            self._convFluxWeighter =   LW.Weighter(LW.nuSQUIDSAtmFlux(self.steering["resources"]["conv_atmo_flux"]),self._xs_obj, self._lic_files)
+            self._promptFluxWeighter = LW.Weighter(LW.nuSQUIDSAtmFlux(self.steering["resources"]["prompt_atmo_flux"]),self._xs_obj, self._lic_files)
+            self._astroFluxWeighter =  LW.Weighter(LW.nuSQUIDSAtmFlux(self.steering["resources"]["astro_file"]),self._xs_obj, self._lic_files)
+        else:
+            self._convFluxWeighter =   None
+            self._promptFluxWeighter = None
+            self._astroFluxWeighter =  None
+
         self._barr_resources = self._load_barr_resources()
+
         Logger.Log("Loaded in Weighter data")
 
         # these will be necessary if we use two atmospheric files 
         #self._pionFluxWeighter = LW.Weighter(self.steering["resources"]["pion_atmo_flux"],self._xs_obj, self._lic_files)
         #self._kaonFluxWeighter = LW.Weighter(self.steering["resources"]["kaon_atmo_file"],self._xs_obj, self._lic_files)
 
+        self._ss_mode = True
+        self._ss_param_names = []
+        self._ss_param_centers = []
+        self._ss_param_sigmas = []
+
         # TODO use different loadMC function depending on mctype (from steering)
         self.loadMC()
         self.loadData()
+
+        # load in the snowstorm centers and sigmas 
+        if self._ss_mode:
+            for entry in self._simToLoad:
+                # load in if empty
+                if self._ss_param_centers==[]:
+                    self._ss_param_centers=self._simToLoad[entry]["snowstorm_centers"]
+                    self._ss_param_sigmas= self._simToLoad[entry]["snowstorm_sigmas"]
+                else:
+                    #check they're the same if not empty 
+                    if not len(self._ss_param_sigmas)==len(self._simToLoad[entry]["snowstorm_sigmas"]):
+                        raise ValueError("One sigmas list had len {}, the other {}".format(len(self._ss_param_sigmas),len(self._simToLoad[entry]["snowstorm_sigmas"])))
+                    if not all(self._ss_param_sigmas[i] == self._simToLoad[entry]["snowstorm_sigmas"] for i in range(len(self._simToLoad[entry]["snowstorm_sigmas"]))):
+                        raise ValueError("Tried loading in samples with different sigmas")
+
+                    if not len(self._ss_param_centers)==len(self._simToLoad[entry]["snowstorm_centers"]):
+                        raise ValueError("One sigmas list had len {}, the other {}".format(len(self._ss_param_centers),len(self._simToLoad[entry]["snowstorm_centers"])))
+                    if not all(self._ss_param_centers[i] == self._simToLoad[entry]["snowstorm_centers"] for i in range(len(self._simToLoad[entry]["snowstorm_centers"]))):
+                        raise ValueError("Tried loading in samples with different sigmas")
+
+
+    def get_splits(self):
+        if not self._ss_mode: #can only do this in snowstorm mode 
+            return
+
+        e_above = np.zeros(shape=(len(self._Eedges)-1, len(self._ss_param_centers)))
+        e_below = np.zeros(shape=(len(self._Eedges)-1, len(self._ss_param_centers)))
+
+        z_above = np.zeros(shape=(len(self._cosThEdges)-1, len(self._ss_param_centers)))
+        z_below = np.zeros(shape=(len(self._cosThEdges)-1, len(self._ss_param_centers)))
+
+        # count all the events above/below in each bin
+        print("There are {} events total.".format(len(np.sum(self.simulation))))
+        made_it = False
+        for i_e in range(len(self.simulation)):
+            for i_cth in range(len(self.simulation[i_e])):
+                for i_azi in range(len(self.simulation[i_e][i_cth])):
+                    for i_topo in range(len(self.simulation[i_e][i_cth][i_azi])):
+                        for i_time in range(len(self.simulation[i_e][i_cth][i_azi][i_topo])):
+                            # this gets us a bin, iterate over the events now
+                            for event in self.simulation[i_e][i_cth][i_azi][i_topo][i_time]:
+                                if not made_it:
+                                    print("Should be at least one")
+                                    made_it = True
+                                evt_params = event.snowStormParams
+                                n_eff = event.oneWeight*temporary_fluxfunc(event.primaryEnergy)
+
+                                for i_param in range(len(self._ss_param_centers)):
+                                    if evt_params[i_param]>self._ss_param_centers[i_param]:
+                                        e_above[i_e][i_param] +=n_eff
+                                        z_above[i_cth][i_param] +=n_eff
+                                    else:
+                                        e_below[i_e][i_param]+=n_eff
+                                        z_below[i_cth][i_param]+=n_eff
+
+
+        # split along all the different snow storm parameters 
+        e_gradient =  np.zeros(shape=(len(self._Eedges)-1, len(self._ss_param_centers)))
+        z_gradient =  np.zeros(shape=(len(self._cosThEdges)-1, len(self._ss_param_centers)))
+
+        for i_param in range(len(self._ss_param_centers)):
+            for e_bin in range(len(e_gradient)):
+                e_gradient[e_bin][i_param] = (1/self._ss_param_sigmas[i_param])*sqrt(pi/2)*(e_above[e_bin][i_param] - e_below[e_bin][i_param])
+            for cth_bin in range(len(z_gradient)):
+                z_gradient[cth_bin][i_param] = (1/self._ss_param_sigmas[i_param])*sqrt(pi/2)*(z_above[cth_bin][i_param] - z_below[cth_bin][i_param])
+
+        # get the covariance matrices for the nuisance paramters
+        # these come from calibration, right now I just have a diagonal covariance 
+        cov_mat = np.zeros(shape=(len(self._ss_param_centers), len(self._ss_param_centers)))
+        for i in range(len(self._ss_param_centers)):
+            cov_mat[i][i] = 1.
+        multiv_gauss = np.linalg.inv(cov_mat)
+
+        # extract analysis level covariance 
+        final_cov_e = np.zeros(shape=(len(self._Eedges)-1,len(self._Eedges)-1))
+        final_cov_cth = np.zeros(shape=(len(self._cosThEdges)-1,len(self._cosThEdges)-1))
+        for i_sandwich in range(len(self._ss_param_centers)):
+            for j_sandwich in range(len(self._ss_param_centers)):
+                for i_alpha in range(len(e_gradient)):
+                    for i_beta in range(len(e_gradient)):
+                        final_cov_e[i_alpha][i_beta] = e_gradient[i_alpha][i_sandwich]*multiv_gauss[i_sandwich][j_sandwich]*e_gradient[i_beta][j_sandwich]
+
+                for i_alpha in range(len(z_gradient)):
+                    for i_beta in range(len(z_gradient)):
+                        final_cov_cth[i_alpha][i_beta] = z_gradient[i_alpha][i_sandwich]*multiv_gauss[i_sandwich][j_sandwich]*z_gradient[i_beta][j_sandwich]
+
+        return(final_cov_e, final_cov_cth)
+
 
     def _load_barr_resources(self):
         """
@@ -157,7 +267,7 @@ class Data:
     def _fillCache(self, event):
         if not isinstance(event, Event):
             Logger.Fatal("Cannot add cache to {}",format(type(event)), TypeError)
-        nucache = EventCache(0.,0.)
+        nucache = EventCache(event.oneWeight ,self._livetime)
 
         # make a Lw event
         nuEvent = LW.Event()
@@ -171,7 +281,9 @@ class Data:
         nuEvent.final_state_particle_0 = LW.ParticleType(event.finalType0)
         nuEvent.final_state_particle_1 = LW.ParticleType(event.finalType1)
         nuEvent.primary_type = LW.ParticleType(event.primaryType)
-        nucache["convWeight"] = self._convFluxWeighter(nuEvent)*self._livetime/event.num_events
+        event.setOneWeight( self._convFluxWeighter(nuEvent)*self._livetime/event.num_events )
+        nucache["convWeight"] = event.oneWeight
+        #nucache["convWeight"] =self._convFluxWeighter(nuEvent)*self._livetime/event.num_events
         nucache["convPionWeight"] = nucache["convWeight"]
         
         nucache["promptWeight"] = self._promptFluxWeighter(nuEvent)*self._livetime/event.num_events
@@ -179,7 +291,7 @@ class Data:
             nucache["astroMuWeight"] = self._astroFluxWeighter(nuEvent)*self._livetime/event.num_events
         # TODO Add contribution from tau neutrinos 
         if abs(event.primaryType)==12: #electron
-            falvor = 0
+            flavor = 0
         elif abs(event.primaryType)==14: #mu
             flavor = 1
         elif abs(event.primaryType)==16: #tau
@@ -200,18 +312,93 @@ class Data:
 
         TODO: put the mctype in the simdata json file, that way we can have this load in data from different analyses 
         """
-        if self.steering["mctype"].lower() == "hese":
-            self._loadFile_hese(which_file, target_hist, is_mc)
-        elif self.steering["mctype"].lower() == "sterile":
-            self._loadFile_sterile(which_file, target_hist, is_mc)
-        else:
-            Logger.Fatal("MC Type {} is unimplemented".format(self.steering["mctype"]), NotImplementedError)
+        access_key = "mctype" if is_mc else "datatype"
 
-    def _loadFile_sterile(self, which_file, target_hist, is_mc):
+        if is_mc and self.steering["mctype"].lower()!="casc_dnn":
+            self._ss_mode = False
+        if self.steering[access_key].lower() == "hese":
+            self._loadFile_hese(which_file, target_hist, is_mc)
+        elif self.steering[access_key].lower() == "sterile":
+            self._loadFile_sterile(which_file, target_hist, is_mc)
+        elif self.steering[access_key].lower()=="casc_dnn":
+            self._loadFile_casc_dnn(which_file, target_hist, is_mc)
+        else:
+            Logger.Fatal("Access Key Type {} is unimplemented".format(self.steering[access_key]), NotImplementedError)
+
+    def _loadFile_casc_dnn(self, which_file, target_hist, is_mc=True):
         Logger.Log("Opening {}".format(which_file))
         data = h5.File(which_file, 'r')
         i_event = 0
 
+        _e_reco = data["reco_energy"][:]
+        _a_reco = data["reco_azimuth"][:]
+        _z_reco = data["reco_zenith"][:]
+        
+        _e_true = data["true_energy"][:]
+        _a_true = data["true_azimuth"][:]
+        _z_true = data["true_zenith"][:]
+        _weight = data["one_weight"][:]
+        _tcd = data["total_column_depth"][:]
+        _prim = data["true_pid"][:]
+        _bjx = data["true_bjorkenx"][:]
+        _bjy = data["true_bjorkeny"][:]
+
+        _casc = data["cascade_score_reco"][:]
+        _track = data["track_score_reco"][:]
+        _snow_storm_params = data["snowstorm_params"][:]
+        _snowstorm_ref = data["snowstorm_ref"][:]
+        Logger.Log("{} refs ones, {} snowstorm ones".format(len(_e_reco), len(_snowstorm_ref)))
+        
+        if self._ss_param_names==[]:
+            self._ss_param_names = _snowstorm_ref
+        else:
+            if len(_snowstorm_ref)!=len(self._ss_param_names):
+                raise ValueError("Trying to load snowstorm params of different length {}!={}".format(self._ss_param_names, _snowstorm_ref))
+            else:
+                if not all(_snowstorm_ref[i]==self._ss_param_names[i] for i in range(len(_snowstorm_ref))):
+                    raise ValueError("Trying to load non-matching snowstorm params: {} and {}".format(_snowstorm_ref, self._ss_param_names))                
+
+        Logger.Log("Opened!")  
+        i_max = len(_e_reco)
+        while i_event < i_max:
+            new_event = Event()
+            new_event.setEnergy(  _e_reco[i_event] )
+            new_event.setZenith( cos(_z_reco[i_event]) )
+            new_event.setAzimuth( _a_reco[i_event] )
+            new_event.setTopology( 0 if _track[i_event]>_casc[i_event] else 1 ) 
+            new_event.setYear( 0 ) #TODO change this when you want to bin in time     
+            if is_mc:
+                new_event.setIsMC(True)
+                new_event.setPrimaryEnergy(  _e_true[i_event] )
+                new_event.setPrimaryAzimuth( _a_true[i_event] )
+                new_event.setRawZenith( _z_true[i_event] ) 
+                new_event.setPrimaryType(int(_prim[i_event]))                
+                #new_event.setFinalType0(int(_fs0[i_event][5]))
+                #new_event.setFinalType1(int(_fs1[i_event][5]))
+                new_event.setNumEvents( i_max )
+                new_event.setOneWeight(_weight[i_event] )
+                new_event.setTotalColumnDepth(_tcd[i_event])
+                new_event.setIntX( _bjx[i_event])
+                new_event.setIntY( _bjy[i_event])
+                new_event.setSnowStormParams( list(_snow_storm_params[_snowstorm_ref[i_event]]) )
+                # self._fillCache(new_event) <-- we need new weighters to do this 
+
+            target_hist.add(new_event, new_event.energy, new_event.zenith, new_event.azimuth, new_event.topology, new_event.year)
+
+            if i_event%25000==0:
+                Logger.Log("Loaded {} Events so far".format(i_event))
+            i_event+=1 
+        data.close()
+
+    def _loadFile_sterile(self, which_file, target_hist, is_mc):
+        """
+        used to load the "sterile" tag MC
+        """
+        Logger.Log("Opening {}".format(which_file))
+        data = h5.File(which_file, 'r')
+        i_event = 0
+
+        # by doing this, we load the whole dataset into memory at once. Otherwise it loads only chunks, and slooooows down this process tremendously 
         _e_reco = data["MuExEnergy"][:]
         _z_reco = data["MuExZenith"][:]
         _a_reco = data["MuExAzimuth"][:]

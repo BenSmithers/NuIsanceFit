@@ -23,6 +23,7 @@ cdef class Event:
     cdef readonly int _topology
     cdef readonly int _year
     cdef readonly dict _cachedweight
+    cdef readonly list _snowstorm_params
 
     # we want some c-level access functions that avoid the python stack!
     cdef float getPrimaryEnergy(self)

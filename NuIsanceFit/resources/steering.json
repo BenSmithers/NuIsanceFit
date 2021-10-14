@@ -1,15 +1,15 @@
 {
     "binning":{
         "energy":{
-            "min":5,
-            "max":1e7,
-            "bins":50,
+            "min":5e2,
+            "max":100e3,
+            "bins":20,
             "log":true
         },
         "cosTh":{
             "min":-1,
             "max":1,
-            "bins":30,
+            "bins":15,
             "log":false
         },
         "azimuth":{
@@ -27,10 +27,11 @@
     },
     "datadir":"/home/benito/software/golem_fit/sources/GolemFit/monte_carlo/STERILE/",
     "simToLoad":{
-        "name":"Platinum_lite_HE"
+        "name":"DNN_L4_Reco"
     },
     "dataToLoad":"IC86_EHE_Nominal_Platinum_6687.h5",
-    "mctype":"STERILE",
+    "mctype":"casc_dnn",
+    "datatype":"STERILE",
     "livetimes":{
         "0":331.0,
         "1":331.0,

@@ -17,8 +17,16 @@ class Fitter:
         self._data = Data(steering)
         self._llhobj = llhMachine(self._data, steering)
 
+    def minLLH(self):
+        return self._llhobj.minimize()
+
+    def getGradients(self):
+        return self._data.get_splits()
+
     def get_centers(self):
         return self._data.simulation.centers
+    def get_edges(self):
+        return self._data.simulation.edges
 
     def get_expectation(self,params):
         if not isinstance(params, ParamPoint):

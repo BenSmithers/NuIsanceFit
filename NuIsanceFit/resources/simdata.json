@@ -1204,5 +1204,12 @@
         "holeiceForward":-1.0,
         "anisotropyScale":1.0,
         "lic_file":"Ares_LE_Generation_data.lic"
+    },
+    "DNN_L4_Reco":{
+        "filename":"combo_dnnreco.hdf5",
+        "split":false,
+        "n_gen": 10,
+        "snowstorm_centers":[1,1,1,1,0,0],
+        "snowstorm_sigmas":[0.05773502,0.05773502,0.5773502, 0.05773502, 0.5773502, 0.11547005]
     }
 }

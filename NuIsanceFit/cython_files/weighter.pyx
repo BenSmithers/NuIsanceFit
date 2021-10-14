@@ -196,14 +196,11 @@ cdef class AttenuationWeighter(FluxCompWeighter):
         self.scale_nubar = params[1]
 
     cpdef float evalEvt(self,Event event):
-        cdef float scale
-
+        cdef float correction
         if event._primaryType>0:
-            scale = self.scale_nu
+            correction = self.spline_map[self.fluxComp][event.getPrimaryType()]((event.getLogPrimaryEnergy(), event.getPrimaryZenith(), self.scale_nu))
         else:
-            scale = self.scale_nubar
-        
-        cdef float correction = self.spline_map[self.fluxComp][event.getPrimaryType()]((event.getLogPrimaryEnergy(), event.getPrimaryZenith(), scale))
+            correction = self.spline_map[self.fluxComp][event.getPrimaryType()]((event.getLogPrimaryEnergy(), event.getPrimaryZenith(), self.scale_nubar))
 
         if correction < 0:
             raise ValueError("Weighter returned negative weight {}!".format(correction))
@@ -382,7 +379,7 @@ cdef class SimWeighter:
         return( list(edges), list(values) )
 
     def configure(self, dict params):
-        # self.params = params.as_dict()
+        self.params = params
 
         # some of these need to be reconfigured 
 
