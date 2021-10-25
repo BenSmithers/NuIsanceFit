@@ -131,10 +131,14 @@ cdef class Event:
         """
         This sets both the raw zenith and the zenith
         """
-        if not ((rawzenith>0) and (rawzenith<pi)):
-            raise ValueError("Zenith angle should be between 0 and pi")
-        self._rawPrimaryZenith = rawzenith
-        self.setPrimaryZenith(cos(self._rawPrimaryZenith))
+        if rawzenith>pi and rawzenith<(pi+1e-5):
+            self._rawPrimaryZenith = pi
+            self.setPrimaryZenith(-1)
+        else:
+            if not ((rawzenith>0) and (rawzenith<=pi)):
+                raise ValueError("Zenith angle should be between 0 and pi, got {}".format(rawzenith))
+            self._rawPrimaryZenith = rawzenith
+            self.setPrimaryZenith(cos(self._rawPrimaryZenith))
 
     def setIntX(self, float intX):
         if intX<0:

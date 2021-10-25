@@ -276,8 +276,9 @@ class Data:
         nuEvent.azimuth = event.primaryAzimuth
         nuEvent.zenith = event.rawPrimaryZenith
         nuEvent.total_column_depth = event.totalColumnDepth
-        nuEvent.interaction_x = event.intX
-        nuEvent.interaction_y = event.intY
+        if event.intX>0 and event.intY>0:
+            nuEvent.interaction_x = event.intX
+            nuEvent.interaction_y = event.intY
         nuEvent.final_state_particle_0 = LW.ParticleType(event.finalType0)
         nuEvent.final_state_particle_1 = LW.ParticleType(event.finalType1)
         nuEvent.primary_type = LW.ParticleType(event.primaryType)
@@ -378,8 +379,11 @@ class Data:
                 new_event.setNumEvents( i_max )
                 new_event.setOneWeight(_weight[i_event] )
                 new_event.setTotalColumnDepth(_tcd[i_event])
-                new_event.setIntX( _bjx[i_event])
-                new_event.setIntY( _bjy[i_event])
+                # these are -1 for GR events 
+                if _bjx[i_event]>0:
+                    new_event.setIntX( _bjx[i_event])
+                if _bjy[i_event]>0:
+                    new_event.setIntY( _bjy[i_event])
                 new_event.setSnowStormParams( list(_snow_storm_params[_snowstorm_ref[i_event]]) )
                 # self._fillCache(new_event) <-- we need new weighters to do this 
 
