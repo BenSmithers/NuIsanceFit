@@ -24,8 +24,10 @@ print("cth {}".format(c_grad))
 
 edges = fif.get_edges()
 
-# plot the energy edges 
-plt.pcolormesh( edges[0], edges[0], e_grad, vmin=-0.02, vmax=0.02, cmap='cividis')
+# plot the energy edges
+ext = np.average(e_grad) + 2*np.std(e_grad)
+
+plt.pcolormesh( edges[0], edges[0], e_grad, vmin=-ext, vmax=ext, cmap='cividis')
 plt.yscale('log')
 plt.xscale('log')
 plt.xlabel(r"$E_{\nu}^{reco}$ [Gev]",size=14)
@@ -37,7 +39,8 @@ plt.show()
 
 
 # plot the energy edges 
-plt.pcolormesh( edges[1], edges[1], c_grad, vmin=-0.01,vmax=0.01, cmap='cividis')
+ext = np.average(c_grad) + 2*np.std(c_grad)
+plt.pcolormesh( edges[1], edges[1], c_grad, vmin=-ext,vmax=ext, cmap='cividis')
 plt.xlabel(r"$\cos\theta_{z}^{reco}$",size=14)
 plt.ylabel(r"$\cos\theta_{z}^{reco}$",size=14)
 cbar = plt.colorbar()

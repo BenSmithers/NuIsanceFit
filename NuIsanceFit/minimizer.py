@@ -10,7 +10,7 @@ CPrior
 SAYLikelihood
 """
 
-from NuIsanceFit.param import ParamPoint, PriorSet
+from NuIsanceFit.param import ParamPoint, PriorSet, params
 from NuIsanceFit.logger import Logger 
 from NuIsanceFit.weighter import SimWeighter, SimpleDataWeighter
 from NuIsanceFit.histogram import bHist, eventBin, flatten, transpose
@@ -23,13 +23,10 @@ from math import log, lgamma, log1p
 #log1p - log(1+x)
 
 import numpy as np
-from numbers import Number 
 
-from torch import Tensor, optim
+from numba import jit
 
-from torch._C import Value
-import param
-
+from scipy.optimize import minimize
 
 """
 These three likelihood functions are from Phystools, they were defined over here
@@ -52,7 +49,6 @@ def poissonLikelihood(dataCount, lambdaVal, dtype=float):
     else:
         sum_val = lambdaVal + lgamma(dataCount+1)
         return(dataCount*log(lambdaVal) - sum_val)
-
 
 def SAYLikelihood(k, w_sum, w2_sum, dtype=float):
     """
@@ -128,6 +124,8 @@ class llhMachine:
         # also verifies the order is unchanged
         self._templated_params=[]
 
+        self._n_seeds = 4
+
         self.setLikelihoodFunc( SAYLikelihood )
 
     # ========================== Getters and Setters ===============================
@@ -166,8 +164,7 @@ class llhMachine:
         #TODO  need to validate the other things!
 
     # ================================ Parts that actually do things =====================
-
-    def _likelihoodCore(self, this_obs:eventBin, this_sim: eventBin):
+    def _likelihoodCore(self, this_obs:eventBin, this_sim: eventBin)->float:
         """
         This is the function called by the threader. 
 
@@ -226,8 +223,9 @@ class llhMachine:
         llh += this_llh
         
         return llh
+    
 
-    def _evaluateLikelihood(self, _params:Tensor)->Tensor:
+    def _evaluateLikelihood(self, _params:np.ndarray)->float:
         """
         Here, we take our binned histograms. We separate them along the first axis, flatten along the other four axes. 
         Then we use the core function 
@@ -253,15 +251,17 @@ class llhMachine:
 
 
         # this is a deterministic process, so the bin ordering shouldn't be affected 
-        flat_obs = [flatten(axis0) for axis0 in self.observation]
-        flat_sim = [flatten(axis0) for axis0 in self.simulation]
+        #flat_obs = [flatten(axis0) for axis0 in self.observation]
+        #flat_sim = [flatten(axis0) for axis0 in self.simulation]
+        flat_obs=flatten(self.observation)
+        flat_sim=flatten(self.simulation)
         pairs = [[flat_obs[i], flat_sim[i]] for i in range(len(flat_obs))]
        
         Logger.Trace("Starting up Threader for LLH calculation")
         # now prepare these into pairs of stacks for the threading
-        llh += sum([self._likelihoodCore(pair) for pair in pairs])
+        llh += sum([self._likelihoodCore(flat_obs[i], flat_sim[i]) for i in range(len(flat_obs))])
         
-        return(Tensor([-llh]))
+        return -llh
 
     def minimize(self):
         """
@@ -271,28 +271,39 @@ class llhMachine:
         """
 
         if self._minimum is None:
-            initial_guess = ParamPoint()
+            initial_guess = ParamPoint(reseed=True)
         else:
             initial_guess = self._minimum
-        
-        initial_model = self.convert_params_to_tensor(initial_guess)
-        optimizer = optim.lbfgs(params=initial_guess.as_dict(), lr=0.01, max_iter=20000)
 
+
+        initial_model = self.convert_params_to_tensor(initial_guess)
+
+        #optimizer = optim.LBFGS(params=[initial_model], lr=1.0, max_iter=20000)
+
+        bounds = [(params[key].min, params[key].max) for key in initial_guess.valid_keys]
+        # we want to repeat this multiple times according to the widths of the params. Seeding, woo! 
+        best = minimize(self._evaluateLikelihood, x0=initial_model, method='L-BFGS-B', bounds=bounds)
+
+        Logger.Log(best.message)
+        Logger.Log("It was {}successful".format("" if best.success else "not "))
+        """
         def closeure():
             optimizer.zero_grad()
             loss = self._evaluateLikelihood(initial_model)
             loss.backward()
             return loss
-        optimizer.step(closeure)
+        for i in range(400):
+            optimizer.step(closeure)
+        """ 
 
 
-        return ParamPoint()
+        return self.convert_tensor_to_params(best.x)
 
     def convert_params_to_tensor(self, params:ParamPoint):
         """
-        Converts the params into a pytorch Tensor for interfacing with PyTorch 
+        Converts the params into a pytorch tensor for interfacing with PyTorch 
         """
-        keys = params.valid_keys()
+        keys = params.valid_keys
         # set the template, check it against the other one otherwise 
         if len(self._templated_params) == 0:
             self._templated_params=keys
@@ -301,9 +312,9 @@ class llhMachine:
             if not keys==self._templated_params:
                 Logger.Fatal("It looks like the params changed at some point. From {} to {}".format(self._templated_params, keys),ValueError)
 
-        return Tensor([params[key] for key in keys])
+        return np.array([params[key] for key in keys])
 
-    def convert_tensor_to_params(self, tensor:Tensor):
+    def convert_tensor_to_params(self, tensor:np.ndarray):
         if len(self._templated_params)==0:
             Logger.Fatal("Cannot convert {} to params object, don't have a template yet.".format(tensor), ValueError)
         if not len(tensor)==len(self._templated_params):

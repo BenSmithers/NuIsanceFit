@@ -1206,7 +1206,7 @@
         "lic_file":"Ares_LE_Generation_data.lic"
     },
     "DNN_L4_Reco":{
-        "filename":"combo_dnnreco.hdf5",
+        "filename":"combo_dnnreco",
         "split":false,
         "n_gen": 10,
         "snowstorm_centers":[1,1,1,1,0,0],

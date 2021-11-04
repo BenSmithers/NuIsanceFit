@@ -64,12 +64,14 @@ class Data:
             Logger.Fatal("Expected {}, got {}".format(dict, type(steering)))
         self.steering = steering
 
-       # year, azimuth, zenith, energy  
+       # this is now a dictionary with an entry for each set we're loading. 
+       # the sets are the same as those defined in simdata.json
         self._simToLoad = self._get_filtered_sims()
 
         self._dataToLoad = [steering["dataToLoad"]]
         self._dataToLoad = [os.path.join( steering["datadir"], entry) for entry in self._dataToLoad]
         
+        # verify that each of those entries exists! 
         for entry in self._simToLoad:
             fn = os.path.join(steering["datadir"], self._simToLoad[entry]["filename"])
             if not os.path.exists(fn):
@@ -89,6 +91,7 @@ class Data:
         self._timeEdges = make_edges(bins, "year") 
         self._livetime = 1.0 # this should come from the steering 
 
+        # year, azimuth, zenith, energy  
         # ENERGY | COSTH | AZIMUTH | TOPOLOGY | TIME
         self.simulation = bHist([ self._Eedges, self._cosThEdges, self._azimuthEdges, self._topoEdges, self._timeEdges ], bintype=eventBin,datatype=Event)
         self.data = bHist([ self._Eedges, self._cosThEdges, self._azimuthEdges, self._topoEdges, self._timeEdges ], bintype=eventBin,datatype=Event)
@@ -347,17 +350,11 @@ class Data:
         _casc = data["cascade_score_reco"][:]
         _track = data["track_score_reco"][:]
         _snow_storm_params = data["snowstorm_params"][:]
-        _snowstorm_ref = data["snowstorm_ref"][:]
+        _snowstorm_ref = data["snowstorm_ref"][:] # reference to which m frame we're using I think 
         Logger.Log("{} refs ones, {} snowstorm ones".format(len(_e_reco), len(_snowstorm_ref)))
         
-        if self._ss_param_names==[]:
-            self._ss_param_names = _snowstorm_ref
-        else:
-            if len(_snowstorm_ref)!=len(self._ss_param_names):
-                raise ValueError("Trying to load snowstorm params of different length {}!={}".format(self._ss_param_names, _snowstorm_ref))
-            else:
-                if not all(_snowstorm_ref[i]==self._ss_param_names[i] for i in range(len(_snowstorm_ref))):
-                    raise ValueError("Trying to load non-matching snowstorm params: {} and {}".format(_snowstorm_ref, self._ss_param_names))                
+        # TODO: put in some checker so that it makes sure all the events have the same number of snowstorm parameters 
+        #  may also want it to keep track of the parameter names                 
 
         Logger.Log("Opened!")  
         i_max = len(_e_reco)
@@ -517,7 +514,7 @@ class Data:
             filename = os.path.join( self.steering["datadir"], self._simToLoad[entry]["filename"])
             if os.path.isdir(filename):
                 # scan through the contents of the folder 
-                contents = glob(os.path.join(filename, "*.h5"))
+                contents = glob(os.path.join(filename, "*.hdf5"))
                 for content in contents:
                     self._loadFile(content, self.simulation, True)
             else:

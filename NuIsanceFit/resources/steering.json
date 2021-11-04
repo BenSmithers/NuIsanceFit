@@ -3,13 +3,13 @@
         "energy":{
             "min":5e2,
             "max":100e3,
-            "bins":20,
+            "bins":12,
             "log":true
         },
         "cosTh":{
             "min":-1,
             "max":1,
-            "bins":15,
+            "bins":10,
             "log":false
         },
         "azimuth":{

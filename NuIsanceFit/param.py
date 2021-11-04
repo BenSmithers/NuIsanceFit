@@ -2,6 +2,8 @@ import numpy as np
 import os, json
 from numbers import Number # parent of all numbers 
 from math import sqrt, pi, log
+from numpy import random
+from numpy.random import rand, randn
 
 from NuIsanceFit.logger import Logger
 
@@ -18,6 +20,8 @@ class Prior:
         Logger.Fatal("Need to use derived class", NotImplementedError)
     def __call__(self):
         Logger.Fatal("Need to use derived class", NotImplementedError)
+    def inverse(self)->float:
+        Logger.Fatal("Need to use derived class", NotImplementedError)
 
 class UniformPrior(Prior):
     """
@@ -30,6 +34,9 @@ class UniformPrior(Prior):
             Logger.Fatal("maxval should be {}, not {}".format(float, type(maxval)), TypeError)
         self.min = minval
         self.max = maxval
+
+    def inverse(self)->float:
+        return rand()*(self.max - self.min) - self.min
 
     def __call__(self, x):
         if x<self.min or x>self.max:
@@ -57,6 +64,9 @@ class GaussianPrior(Prior):
         z = (x-self.mean)/self.stddev 
         return log(self.norm)-(z*z)/2 
 
+    def inverse(self) -> float:
+        return self.stddev*randn() + self.mean
+
 class LimitedGaussianPrior(Prior):
     def __init__(self, mean, stddev, minval, maxval):
         # these two will enforce type-ing! 
@@ -66,6 +76,11 @@ class LimitedGaussianPrior(Prior):
     def __call__(self,x):
         return self.limits(x) + self.prior(x)
 
+    def inverse(self) -> float:
+        value = self.limits.min
+        while (value<=self.limits.min or value>=self.limits.max):
+            value = self.prior.inverse()
+        return value 
 
 class Gaussian2DPrior(Prior):
     """
@@ -189,6 +204,9 @@ class Param:
     def max(self):
         return self._max
 
+    def inverse(self):
+        return self.prior.inverse()
+
     def __str__(self):
         return( "Param: center {}; width {}; min {}, max {}. Will {}Fit\n".format( self.center, self.width, self.min, self.max, "" if self._fit else "not "))
 
@@ -209,8 +227,10 @@ for entry in _params_raw.keys():
 class ParamPoint:
     """
     Set of values corresponding to the loaded parameters. Has a value for each parameter
+
+    This is used to represent a point in nuisance parameter space! 
     """
-    def __init__(self, **kwargs):
+    def __init__(self,reseed=False, **kwargs):
         """
         Create this object, set the attributes corresponding to the centers loaded in from the json file 
         """
@@ -219,7 +239,10 @@ class ParamPoint:
         self.values = {}
 
         for key in params.keys():
-            self.values[str(key)] = params[key].center
+            if reseed:
+                self.values[str(key)] = params[key].inverse()
+            else:
+                self.values[str(key)] = params[key].center
 
         # now set any non-default arguments 
         for kwarg in kwargs:
@@ -252,17 +275,26 @@ class ParamPoint:
 
     def as_dict(self):
         return self.values
+    
+    def __str__(self):
+        value = ""
+        for key in self.values:
+            value+= "{}: {} from {}\n".format(key, self.values[key], params[key].center)
+        return value
 
 class PriorSet:
+    """
+    Holds the priors, is used to calculate a prior LLH 
+    """
     def __init__(self):
         self.astro_cor = 0.70
         self.icegrad_cor = 5.091035738186185100e-02
         self.ice_gradient_joined_prior = Gaussian2DPrior(params["icegrad0"].center, params["icegrad1"].center, 
                                                          params["icegrad0"].width, params["icegrad1"].width,
                                                          self.icegrad_cor)
-        self.astro_correlated_prior    = Gaussian2DPrior(params["astro1Comp2DNorm"].center, params["astro1Comp2DDeltaGamma"].center,
-                                                         params["astro1Comp2DNorm"].width,  params["astro1Comp2DDeltaGamma"].width, 
-                                                         self.astro_cor)
+        #self.astro_correlated_prior    = Gaussian2DPrior(params["astro1Comp2DNorm"].center, params["astro1Comp2DDeltaGamma"].center,
+        #                                                 params["astro1Comp2DNorm"].width,  params["astro1Comp2DDeltaGamma"].width, 
+        #                                                 self.astro_cor)
 
     def __call__(self, these_params):
         value = 0.0
@@ -272,7 +304,7 @@ class PriorSet:
 
         # add up contributions from the 2D ones 
         value += self.ice_gradient_joined_prior( these_params["icegrad0"], these_params["icegrad1"] )
-        value += self.astro_correlated_prior( these_params["astro1Comp2DNorm"], these_params["astro1Comp2DDeltaGamma"])
+        #value += self.astro_correlated_prior( these_params["astro1Comp2DNorm"], these_params["astro1Comp2DDeltaGamma"])
 
         return value
 
