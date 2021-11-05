@@ -11,17 +11,22 @@ from scipy import interpolate
 from NuIsanceFit import steering
 from NuIsanceFit.utils import NewPhysicsParams
 from NuIsanceFit import Logger
+from NuIsanceFit.weighter import FluxComponent
+
+try:
+    import nuSQuIDS as nsq
+except ImportError:
+    import nuSQUIDSpy as nsq
 
 import os
 import pickle
-
 
 # simulates the cosmic ray showers 
 from MCEq.core import MCEqRun
 import crflux.models as crf
 
 import numpy as np
-from math import sin, asin, acos, pi
+from math import sin, asin, acos, pi, log10
 
 from scipy.interpolate import interp1d
 
@@ -61,6 +66,73 @@ def _get_key(flavor:int, neutrino:int)->str:
         raise ValueError("Invalid Neutrino Type {}".format(neutrino))
 
     return(key)
+
+# this will need to be modifed for distributed computing jobs 
+xs_obj = nsq.loadDefaultCrossSections()
+
+def evolve_flux(which:FluxComponent, params:NewPhysicsParams, **kwargs):
+    if which==FluxComponent.atmConv:
+        state_setter = _conv_initial_state
+    elif which==FluxComponent.atmPrompt:
+        state_setter = _prompt_initial_state
+    elif which==FluxComponent.diffuseAstro:
+        state_setter = _astr_initial_state
+    else:
+        raise NotImplementedError("Unimplemented flux component: {}".format(which))
+
+
+    n_nu = 4
+    Emin = 1.*(1e9)
+    Emax = 10.*(1e15)
+    cos_zenith_min = -0.999
+    cos_zenith_max = 0.2
+
+    use_earth_interactions = True
+
+    zeniths = nsq.linspace(cos_zenith_min, cos_zenith_max, angular_bins)
+    energies = nsq.logspace(Emin, Emax, energy_bins) # DIFFERENT FROM NUMPY LOGSPACE
+
+    nus_atm = nsq.nuSQUIDSAtm(zeniths, energies, n_nu, nsq.NeutrinoType.both, use_earth_interactions)
+
+    nus_atm.Set_MixingAngle(0,1,0.563942)
+    nus_atm.Set_MixingAngle(0,2,0.154085)
+    nus_atm.Set_MixingAngle(1,2,0.785398)
+    nus_atm.Set_SquareMassDifference(1,7.65e-05)
+    nus_atm.Set_SquareMassDifference(2,0.00247)
+
+    #sterile parameters 
+    nus_atm.Set_MixingAngle(0,3,params.theta03)
+    nus_atm.Set_MixingAngle(1,3,params.theta13)
+    nus_atm.Set_MixingAngle(2,3,params.theta23)
+    nus_atm.Set_SquareMassDifference(3,params.msq2)
+
+    nus_atm.SetNeutrinoCrossSections(xs_obj)
+
+    nus_atm.Set_TauRegeneration(True)
+
+    #settting some zenith angle stuff 
+    nus_atm.Set_rel_error(1.0e-6)
+    nus_atm.Set_abs_error(1.0e-6)
+    #nus_atm.Set_GSL_step(gsl_odeiv2_step_rk4)
+    nus_atm.Set_GSL_step(nsq.GSL_STEP_FUNCTIONS.GSL_STEP_RK4)
+
+    # we load in the initial state. Generating or Loading from a file 
+    inistate = state_setter(energies, zeniths, n_nu, **kwargs)
+    if np.min(inistate)<0:
+        raise ValueError("Found negative value in inistate: {}".format(np.min(inistate)))
+    nus_atm.Set_initial_state(inistate, nsq.Basis.flavor)
+
+    # we turn off the progress bar for jobs run on the cobalts 
+    nus_atm.Set_ProgressBar(False)
+    nus_atm.Set_IncludeOscillations(True)
+
+    nus_atm.EvolveState()
+
+    int_en = 700
+    int_cos = 100
+    int_min_e = log10(Emin)
+    int_max_e = log10(Emax)
+
 
 def _prompt_initial_state(energies, zeniths, n_nu, **kwargs):
     return _atmo_initial_state(energies, zeniths, n_nu, flux="prompt", **kwargs)
@@ -166,5 +238,31 @@ def _atmo_initial_state(energies, zeniths, n_nu, **kwargs):
     return inistate
 
 
-def astr_initial_state():
-    pass
+def _astr_initial_state(energies, zeniths, n_nu, **kwargs):
+    """
+    Sets up the initial state (pre-osc) for an astrophysical neutrino flux
+
+    Basically a sad looking power-law
+    """
+
+    pivot = 100*(1e12) # eV, needs to be in nuSQuIDS units 
+    norm = 1e-18 # [GeV s cm^2 sr]^-1  <- verify
+    gamma = -2.5
+
+    inistate = np.zeros(shape=(angular_bins, energy_bins, 2, n_nu))
+    
+    def get_flux(energy):
+        return norm*(energy/pivot)**(gamma)
+
+    for i_e in range(energy_bins):
+        flux = get_flux(energies[i_e])
+        if flux<0:
+            raise ValueError("Somehow got negative flux... {}".format(flux))
+        for flavor in range(n_nu):
+            for i_a in range(angular_bins):
+                for neut_type in range(2):
+                    inistate[i_a][i_e][neut_type][flavor] += flux*(kwargs["flavor_ratio"][flavor])
+    return inistate
+
+
+    
