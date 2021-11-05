@@ -3,10 +3,10 @@ import numpy as np
 import matplotlib
 matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
-
-plt.style.use("/home/benito/software/cascade/cascade/cascade.mplstyle")
-
 import os
+
+plt.style.use(os.path.join(os.path.dirname("__file__"), "..", "resources", "cascade.mplstyle"))
+
 from NuIsanceFit.fit import Fitter
 from NuIsanceFit import steering
 from NuIsanceFit.param import ParamPoint
