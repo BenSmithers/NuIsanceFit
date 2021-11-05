@@ -42,7 +42,7 @@ class NewPhysicsParams:
          # only use this for the sterile params, ignore the 3-nu entries
          #      also, this'd be diagonal... but whatever 
         self._thetas = np.zeros(shape=(self._n_neut, self._n_neut))
-        self._deltas = np.zeros(shape=(1,self._n_neut))
+        self._deltas = np.zeros(shape=(self._n_neut, 1))
 
         # check wargs
         for kwarg in kwargs:
@@ -89,12 +89,13 @@ class NewPhysicsParams:
         return self._thetas[i1-1][i2-1] 
 
     def theta14(self):
-        return self._thetas[1][4]
+        return self._thetas[0][3]
     def theta24(self):
-        return self._thetas[2][4]
+        return self._thetas[1][3]
     def theat34(self):
-        return self._thetas[3][4]
-    
+        return self._thetas[2][3]
+    def dm2(self):
+        return self._deltas[3][0] # Delta_41^2
 
     def _parse_kwarg(self, kwarg):
         pass
