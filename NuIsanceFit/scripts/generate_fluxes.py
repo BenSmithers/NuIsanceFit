@@ -11,7 +11,8 @@ from scipy import interpolate
 from NuIsanceFit import steering
 from NuIsanceFit.utils import NewPhysicsParams
 from NuIsanceFit import Logger
-from NuIsanceFit.weighter import FluxComponent
+from NuIsanceFit import weighter
+from weighter import FluxComponent
 
 try:
     import nuSQuIDS as nsq
@@ -70,16 +71,38 @@ def _get_key(flavor:int, neutrino:int)->str:
 # this will need to be modifed for distributed computing jobs 
 xs_obj = nsq.loadDefaultCrossSections()
 
-def evolve_flux(which:FluxComponent, params:NewPhysicsParams, **kwargs):
+def evolve_flux(which:FluxComponent, params:NewPhysicsParams, **kwargs) -> str:
+    """
+        Generates a nuSQUIDSAtm object using a given flux component and a set of new physics parameters.
+        Writes this object to an hdf5 file, and returns the filepath to the generated hdf5 file. 
+    """
+    Logger.Log("Generating Flux")
+
     if which==FluxComponent.atmConv:
         state_setter = _conv_initial_state
+        flux_name = "conv"
     elif which==FluxComponent.atmPrompt:
         state_setter = _prompt_initial_state
+        flux_name = "prompt"
     elif which==FluxComponent.diffuseAstro:
         state_setter = _astr_initial_state
+        flux_name = "astr"
     else:
         raise NotImplementedError("Unimplemented flux component: {}".format(which))
 
+    expected_kwargs = ["force_path", "force_filename"]
+    for kwarg in kwargs:
+        if kwarg not in expected_kwargs:
+            raise ValueError("Unexpected keyword argument: '{}'".format(kwarg))
+
+    if "force_path" in kwargs:
+        root_dir = kwargs["force_path"]
+    else:
+        root_dir = os.path.join(steering["resource_dir"], "fluxes")
+
+    if "force_filename" in kwargs:
+        full_name = kwargs["force_filename"]
+        full_name = "nus_atm_" + flux_name + ".h5"
 
     n_nu = 4
     Emin = 1.*(1e9)
@@ -122,16 +145,17 @@ def evolve_flux(which:FluxComponent, params:NewPhysicsParams, **kwargs):
         raise ValueError("Found negative value in inistate: {}".format(np.min(inistate)))
     nus_atm.Set_initial_state(inistate, nsq.Basis.flavor)
 
+    Logger.Log("Initial State Set, evolving")
     # we turn off the progress bar for jobs run on the cobalts 
     nus_atm.Set_ProgressBar(False)
     nus_atm.Set_IncludeOscillations(True)
 
     nus_atm.EvolveState()
 
-    int_en = 700
-    int_cos = 100
-    int_min_e = log10(Emin)
-    int_max_e = log10(Emax)
+    
+    fname = os.path.join(root_dir, full_name)
+
+    nus_atm.WriteStateHDF5( fname )
 
 
 def _prompt_initial_state(energies, zeniths, n_nu, **kwargs):
@@ -265,4 +289,7 @@ def _astr_initial_state(energies, zeniths, n_nu, **kwargs):
     return inistate
 
 
-    
+if __name__=="__main__":
+    evolve_flux(FluxComponent.atmConv, NewPhysicsParams())
+    evolve_flux(FluxComponent.atmPrompt, NewPhysicsParams())
+    evolve_flux(FluxComponent.diffuseAstro, NewPhysicsParams())

@@ -25,11 +25,11 @@
             "log":false 
         }
     },
-    "datadir":"/home/benito/software/golem_fit/sources/GolemFit/monte_carlo/STERILE/",
+    "datadir":"/home/bsmithers/software/data/nuisancefit/data/",
     "simToLoad":{
         "name":"DNN_L4_Reco"
     },
-    "dataToLoad":"IC86_EHE_Nominal_Platinum_6687.h5",
+    "dataToLoad":"Ares_Nominal_golden_50000.h5",
     "mctype":"casc_dnn",
     "datatype":"STERILE",
     "livetimes":{
@@ -41,7 +41,8 @@
         "5":362.525
     },
     "resources":{
-        "resource_dir":"/home/benito/software/golem_fit/sources/GolemFit/resources",
+        "resource_dir":"/home/bsmithers/software/data/nuisancefit/resources/",
+        "mceq_filename":"mceq_flux.pkl",
         "atmospheric_density_spline":"AtmosphericZenithVariationSplines/atm_density_1s.fits",
         "atmospheric_kaonlosses_spline":"AtmosphericKaonLossesSplines/kaon_loses_1s.fits",
         "attenuation_splines":"AttenuationSplines/STERILE",
