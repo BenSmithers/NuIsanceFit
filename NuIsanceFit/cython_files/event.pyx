@@ -18,12 +18,9 @@ def EventCache(float cache_weight, float livetime):
     this_dict = {}
     # quantities
     this_dict["livetime"] = livetime
-    this_dict["weight"] = cache_weight
 
     # flux cache
-    this_dict["convPionWeight"] = cache_weight
-    this_dict["convKaonWeight"] = cache_weight
-    this_dict["convWeight"] = this_dict["convPionWeight"]
+    this_dict["convWeight"] = cache_weight
     this_dict["promptWeight"] = cache_weight
     this_dict["astroMuWeight"] = cache_weight
     
