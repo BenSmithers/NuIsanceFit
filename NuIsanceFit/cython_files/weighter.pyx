@@ -291,7 +291,7 @@ def fill_fluxcomp_dict(str folder):
 
     return ret_dict
 
-cdef class SimWeighter:
+cdef class SimReWeighter:
     """
     This object can take a set of parameters and create a Meta-MetaWeighter that weights events according to that set of parameters 
 

@@ -12,7 +12,7 @@ SAYLikelihood
 
 from NuIsanceFit.param import ParamPoint, PriorSet, params
 from NuIsanceFit.logger import Logger 
-from NuIsanceFit.weighter import SimWeighter, SimpleDataWeighter
+from NuIsanceFit.weighter import SimReWeighter, SimpleDataWeighter
 from NuIsanceFit.histogram import bHist, eventBin, flatten, transpose
 from NuIsanceFit.nuthread import ThreadManager
 from NuIsanceFit.event import Event
@@ -24,7 +24,7 @@ from math import log, lgamma, log1p
 
 import numpy as np
 
-from numba import jit
+# from numba import jit
 
 from scipy.optimize import minimize
 
@@ -107,7 +107,7 @@ class llhMachine:
         self._includePriors = True
 
         self._dataWeighter = SimpleDataWeighter()
-        self._simWeighter = SimWeighter(self._steering)
+        self._SimReWeighter = SimReWeighter(self._steering)
 
         self._weighttype = float
         self._dataWeighterMaker = None
@@ -158,8 +158,8 @@ class llhMachine:
 
 
     def _validate(self):
-        if not isinstance(self._simWeighter, SimWeighter):
-            Logger.Fatal("SimWeighter should be {}, not {}".format(SimWeighter, type(self._simWeighter)), TypeError)
+        if not isinstance(self._SimReWeighter, SimReWeighter):
+            Logger.Fatal("SimReWeighter should be {}, not {}".format(SimReWeighter, type(self._SimReWeighter)), TypeError)
         
         #TODO  need to validate the other things!
 
@@ -185,7 +185,7 @@ class llhMachine:
         n_events = 0
         for i_event in range(len(this_sim)):
             event = this_sim[i_event]
-            w = self._simWeighter(event)
+            w = self._SimReWeighter(event)
             assert(w>=0)
             w2 = w*w
             assert(w2>=0)
@@ -233,7 +233,7 @@ class llhMachine:
         params=self.convert_tensor_to_params(_params)
         Logger.Trace("Making sim/data Weighters")
         self._dataWeighter = SimpleDataWeighter()
-        self._simWeighter.configure(params.as_dict())
+        self._SimReWeighter.configure(params.as_dict())
  
         # If this is outside our valid parameter space (and we're using the priors), BAIL OUT
         if self._includePriors:

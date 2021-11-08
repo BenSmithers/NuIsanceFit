@@ -64,7 +64,7 @@ cdef class IceGradientWeighter(Weighter):
     cdef readonly list _gradient  
     cdef readonly float _scale 
 
-cdef class SimWeighter:
+cdef class SimReWeighter:
     cdef readonly float medianConvEnergy
     cdef readonly float medianPromptEnergy 
     cdef readonly float astroPivotEnergy
