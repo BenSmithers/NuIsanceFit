@@ -5,6 +5,8 @@ Should be able to make these fluxes
     - conventional atmo
     - prompt atmo
     - astro 
+
+And all the MCEq pre-propagation fluxes (these actually take the longest)
 """
 
 from scipy import interpolate
@@ -56,14 +58,14 @@ def _get_key(flavor:int, neutrino:int)->str:
     elif flavor==3:
         return("") # sterile 
     else:
-        raise ValueError("Invalid flavor {}".format(flavor))
+        Logger.Fatal("Invalid flavor {}".format(flavor), ValueError)
 
     if neutrino==0:
         key+="flux"
     elif neutrino==1:
         key+="bar_flux"
     else:
-        raise ValueError("Invalid Neutrino Type {}".format(neutrino))
+        Logger.Fatal("Invalid Neutrino Type {}".format(neutrino), ValueError)
 
     return(key)
 
@@ -79,13 +81,10 @@ def evolve_flux(which:FluxComponent, params:NewPhysicsParams, **kwargs) -> str:
 
     if which==FluxComponent.atmConv:
         state_setter = _conv_initial_state
-        flux_name = "conv"
     elif which==FluxComponent.atmPrompt:
         state_setter = _prompt_initial_state
-        flux_name = "prompt"
     elif which==FluxComponent.diffuseAstro:
         state_setter = _astr_initial_state
-        flux_name = "astr"
     else:
         raise NotImplementedError("Unimplemented flux component: {}".format(which))
 
@@ -94,20 +93,32 @@ def evolve_flux(which:FluxComponent, params:NewPhysicsParams, **kwargs) -> str:
         if kwarg not in expected_kwargs:
             raise ValueError("Unexpected keyword argument: '{}'".format(kwarg))
 
+
+    # figure out the full name. We have a path and a filename
+    #    check if the user wants to force either of these, and otherwise use the defaults! 
     if "force_path" in kwargs:
         root_dir = kwargs["force_path"]
     else:
-        root_dir = os.path.join(steering["resource_dir"], "fluxes")
+        root_dir = os.path.join(steering["resources"]["resource_dir"])
 
     if "force_filename" in kwargs:
-        full_name = kwargs["force_filename"]
-        full_name = "nus_atm_" + flux_name + ".h5"
+        filename = kwargs["force_filename"]
+    else:
+        if which==FluxComponent.atmConv:
+            filename = steering["resources"]["conv_atmo_flux"]
+        elif which==FluxComponent.atmPrompt:
+            filename = steering["resources"]["prompt_atmo_flux"]
+        else:
+            filename =  steering["resources"]["astro_file"]
+
+    fname = os.path.join(root_dir, filename)
+
 
     n_nu = 4
     Emin = 1.*(1e9)
     Emax = 10.*(1e15)
     cos_zenith_min = -0.999
-    cos_zenith_max = 0.2
+    cos_zenith_max = 0.999
 
     use_earth_interactions = True
 
@@ -123,10 +134,10 @@ def evolve_flux(which:FluxComponent, params:NewPhysicsParams, **kwargs) -> str:
     nus_atm.Set_SquareMassDifference(2,0.00247)
 
     #sterile parameters 
-    nus_atm.Set_MixingAngle(0,3,params.theta03)
-    nus_atm.Set_MixingAngle(1,3,params.theta13)
-    nus_atm.Set_MixingAngle(2,3,params.theta23)
-    nus_atm.Set_SquareMassDifference(3,params.msq2)
+    nus_atm.Set_MixingAngle(0,3,params.theta14)
+    nus_atm.Set_MixingAngle(1,3,params.theta24)
+    nus_atm.Set_MixingAngle(2,3,params.theta34)
+    nus_atm.Set_SquareMassDifference(3,params.dm2)
 
     nus_atm.SetNeutrinoCrossSections(xs_obj)
 
@@ -152,9 +163,8 @@ def evolve_flux(which:FluxComponent, params:NewPhysicsParams, **kwargs) -> str:
     nus_atm.EvolveState()
 
     
-    fname = os.path.join(root_dir, full_name)
-
-    nus_atm.WriteStateHDF5( fname )
+    Logger.Log("Saving {}".format(fname))
+    nus_atm.WriteStateHDF5( fname, True )
 
 
 def _prompt_initial_state(energies, zeniths, n_nu, **kwargs):
@@ -176,15 +186,15 @@ def _atmo_initial_state(energies, zeniths, n_nu, **kwargs):
         ftype = "both"
     
     # use this to stick the "_both" or "_conv" at the end of the filename but before the extention ".pkl"
-    subname = ".".join( steering["mceq_filename"].split(".")[:-1] )
+    subname = ".".join( steering["resources"]["mceq_filename"].split(".")[:-1] )
     subname+= "_"+ftype
-    subname = ".".join([subname,steering["mceq_filename"].split(".")[-1] ])
+    subname = ".".join([subname,steering["resources"]["mceq_filename"].split(".")[-1] ])
 
-    path = os.path.join(steering["resource_dir"], "fluxes", subname)
+    path = os.path.join(steering["resources"]["resource_dir"], subname)
     if os.path.exists(path):
         Logger.Log("Loading MCEq Flux from {}".format(path))
         f = open(path, 'rb')
-        mceq_data_dict = pickle.load(f)
+        inistate = pickle.load(f)
         f.close()
     else:
         Logger.Log("Generating MCEq Flux!")
@@ -205,7 +215,7 @@ def _atmo_initial_state(energies, zeniths, n_nu, **kwargs):
             if angle_deg > 180.:
                 angle_deg = 180.
 
-            print("Evaluating {} deg Flux".format(angle_deg))
+            Logger.Log("Evaluating {} deg Flux".format(angle_deg))
             # for what it's worth, if you try just making a new MCEqRun for each angle, you get a memory leak. 
             # so you need to manually set the angle 
             mceq.set_theta_deg(angle_deg)
@@ -273,18 +283,18 @@ def _astr_initial_state(energies, zeniths, n_nu, **kwargs):
     gamma = -2.5
 
     inistate = np.zeros(shape=(angular_bins, energy_bins, 2, n_nu))
-    
+    flavor_ratio=(1,1,1,0)
     def get_flux(energy):
         return norm*(energy/pivot)**(gamma)
 
     for i_e in range(energy_bins):
         flux = get_flux(energies[i_e])
         if flux<0:
-            raise ValueError("Somehow got negative flux... {}".format(flux))
+            Logger.Fatal("Somehow got negative flux... {}".format(flux), ValueError)
         for flavor in range(n_nu):
             for i_a in range(angular_bins):
                 for neut_type in range(2):
-                    inistate[i_a][i_e][neut_type][flavor] += flux*(kwargs["flavor_ratio"][flavor])
+                    inistate[i_a][i_e][neut_type][flavor] += flux*flavor_ratio[flavor]
     return inistate
 
 
