@@ -13,6 +13,7 @@ Motivations:
  - New features should be easy to implement
  - Stability! Ill-configured parameters should be caught on launch, not after running for a while
  - Keep configuration separate from implementation. Users should only have to edit the configuration files, not the actual code. 
+ - Snowstorm! We wanted a more snowstormy system to handle nuisance parameters, hence the name 
 
 Ultimately this should be as easy to use as possible! 
 
@@ -36,7 +37,6 @@ You need to use Python 3.
 The rest of these are also now (or will soon be) necessary.
  - numpy
  - scipy
- - pytorch 
  - matplotlib 
 
 ### C++ dependencies:
@@ -62,9 +62,8 @@ The process will depend on your package manager; with apt it's as easy as
 ```
 sudo apt-get install cython3
 ```
-Then, navigate to `/path/to/here/NuIsanceFit/cython_files/`, and run the bash script `cython_build.sh`. 
+Then, navigate to `/path/to/here/NuIsanceFit/`, and run the bash script `cython_build.sh`. 
 It will call `python3` and tell it to prepare the cython.
-
 
 # Contributing:
 
@@ -78,15 +77,26 @@ Check out the workboard in the Projects tab! As I do more work here, I'll keep a
  - Use descriptive names for variables. If the function of a variable is not immediately obvious, you should probably rename it. 
 
 ## And other major rules
- - raise exceptions at unexpected situations. The exception message should provide enough detail to debug 
- - always check inputs in functions. Use `isinstance` and not `type(...)==[...]` 
+ - raise exceptions at unexpected situations. The exception message should provide enough detail to debug
+ - always check inputs in functions. Use `isinstance` and not `type(...)==[...]` Better yet, python3 supports explicit typing in function calls. Consider something like 
+```
+def my_function( arg1:int, arg2:float)->flat:
+    [code]
+```
+for a function `my_function` which takes an `int` and a `float` and returns another `float`
  - Always test your code before committing 
  - Do **not** import anything into the global namespace. No `from numpy import *` allowed. This is a pain for debugging, especially when there's overlap 
+ - there's a logger (see `logger.py`) which can be used for... logging. It supports Trace, Log, Warn, and Fatal logging events. 
+   
+   - Trace: closely follow the inner machinations of the code
+   - Log: Follow the general motions, called occasionally 
+   - Warn: something doesn't look right, but let's carry on
+   - Fatal: Cannot recover from this terrible turn of events 
 
 
 ## Naming Schemes
 
-I'm not the most consistent about this (yet). But, I'm working on switching to... 
+I'm not the most consistent about this. But, I'm working on switching to... 
  - use `camelCase` for the most part
  - Classes should start capitalized: `PowerLawTiltWeighter`
  - Prefix internal attributes and functions names with a `_`
@@ -112,7 +122,7 @@ def value(self):
 this ensures things aren't accdentally changed. Similarly, for setters 
 ```
 def set_value(self, value):
-    if not isinstance(value, [dtype]:
+    if not isinstance(value, (dtype)):
         Logger.Fatal("...", ValueError)
     self._value = value 
 ```
