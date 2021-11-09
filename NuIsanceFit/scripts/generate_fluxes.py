@@ -11,8 +11,7 @@ from scipy import interpolate
 from NuIsanceFit import steering
 from NuIsanceFit.utils import NewPhysicsParams
 from NuIsanceFit import Logger
-from NuIsanceFit import weighter
-from weighter import FluxComponent
+from NuIsanceFit.weighter import FluxComponent
 
 try:
     import nuSQuIDS as nsq

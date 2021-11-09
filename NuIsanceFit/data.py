@@ -1,4 +1,4 @@
-from numba.cuda import target
+# from numba.cuda import target
 from NuIsanceFit import Logger
 from NuIsanceFit.histogram import bHist, eventBin
 from NuIsanceFit.event import Event, EventCache
@@ -22,6 +22,31 @@ import LeptonWeighter as LW
 
 def temporary_fluxfunc(energy):
     return (1e-18)*( energy/(100e3) )**-2.2
+
+class SimpleWeighter:
+    def __init__(self, h5_file: str):
+        if not os.path.exists(h5_file):
+            Logger.Fatal("Cannot make Weighter! No such nus_atm file {} ".format(h5_file))
+        self.nus_atm = nsq.nuSQUIDSAtm( h5_file )
+
+    def __call__(self, event:LW.Event)->float:
+        # this_value = nus_atm.EvalFlavor(flavor, angle, reg_energy, 1)
+        primary = float(event.primary_type)
+        nutype = 0 if primary>0 else 1
+
+        if abs(primary)==12: #electron
+            flavor = 0
+        elif abs(primary)==14: #mu
+            flavor = 1
+        elif abs(primary)==16: #tau
+            flavor = 2
+        else:
+            Logger.Fatal("non-neutrino event! PDG: {}".format(primary))
+
+        return self.nus_atm.EvalFlavor(flavor,cos(event.zenith), event.energy*(1e9), nutype)
+
+
+        
 
 def make_edges(bin_params, key):
     """
@@ -270,11 +295,10 @@ class Data:
     def _fillCache(self, event):
         if not isinstance(event, Event):
             Logger.Fatal("Cannot add cache to {}",format(type(event)), TypeError)
-        nucache = EventCache(event.oneWeight ,self._livetime)
+        
 
         # make a Lw event
         nuEvent = LW.Event()
-        nucache["livetime"] = self._livetime
         nuEvent.energy = event.primaryEnergy
         nuEvent.azimuth = event.primaryAzimuth
         nuEvent.zenith = event.rawPrimaryZenith
@@ -285,14 +309,15 @@ class Data:
         nuEvent.final_state_particle_0 = LW.ParticleType(event.finalType0)
         nuEvent.final_state_particle_1 = LW.ParticleType(event.finalType1)
         nuEvent.primary_type = LW.ParticleType(event.primaryType)
-        event.setOneWeight( self._convFluxWeighter(nuEvent)*self._livetime/event.num_events )
-        nucache["convWeight"] = event.oneWeight
-        #nucache["convWeight"] =self._convFluxWeighter(nuEvent)*self._livetime/event.num_events
-        nucache["convPionWeight"] = nucache["convWeight"]
-        
-        nucache["promptWeight"] = self._promptFluxWeighter(nuEvent)*self._livetime/event.num_events
-        if abs(event.primaryType)==14: 
-            nucache["astroMuWeight"] = self._astroFluxWeighter(nuEvent)*self._livetime/event.num_events
+
+        eff_conv_oneweight = self._convFluxWeighter(nuEvent)*self._livetime #/event.num_events 
+
+        # event.setOneWeight( self._convFluxWeighter(nuEvent)*self._livetime/event.num_events )
+        nucache = EventCache(eff_conv_oneweight ,self._livetime)
+        nucache["convWeight"] = eff_conv_oneweight
+        nucache["promptWeight"] = self._promptFluxWeighter(nuEvent)*self._livetime #/event.num_events
+        nucache["astroMuWeight"] = self._astroFluxWeighter(nuEvent)*self._livetime #/event.num_events
+
         # TODO Add contribution from tau neutrinos 
         if abs(event.primaryType)==12: #electron
             flavor = 0
@@ -302,6 +327,7 @@ class Data:
             flavor = 2
         else:
             Logger.Fatal("non-neutrino event! PDG: {}".format(event.primaryType))
+
         nutype = 0 if event.primaryType>0 else 1
 
         for key in self._barr_resources.keys():
@@ -389,6 +415,9 @@ class Data:
             if i_event%25000==0:
                 Logger.Log("Loaded {} Events so far".format(i_event))
             i_event+=1 
+            if i_event>2e6:
+                Logger.Log("That's too many for one file!")
+                break
         data.close()
 
     def _loadFile_sterile(self, which_file, target_hist, is_mc):
@@ -447,6 +476,10 @@ class Data:
             if i_event%25000==0:
                 Logger.Log("Loaded {} Events so far".format(i_event))
             i_event+=1 
+
+            if i_event>2e6:
+                Logger.Log("That's too many for one file!")
+                break
         data.close()
 
     def _loadFile_hese(self, which_file, target_hist, is_mc):
@@ -499,6 +532,10 @@ class Data:
             if i_event%100000==0:
                 Logger.Log("Loaded {} Events so far".format(i_event))
             i_event+=1 
+
+            if i_event>2e6:
+                Logger.Log("That's too many for one file!")
+                break
 
         data.close()
 
