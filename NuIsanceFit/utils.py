@@ -88,12 +88,16 @@ class NewPhysicsParams:
 
         return self._thetas[i1-1][i2-1] 
 
+    @property
     def theta14(self):
         return self._thetas[0][3]
+    @property
     def theta24(self):
         return self._thetas[1][3]
-    def theat34(self):
+    @property
+    def theta34(self):
         return self._thetas[2][3]
+    @property
     def dm2(self):
         return self._deltas[3][0] # Delta_41^2
 
