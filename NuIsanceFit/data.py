@@ -24,12 +24,21 @@ def temporary_fluxfunc(energy):
     return (1e-18)*( energy/(100e3) )**-2.2
 
 class SimpleWeighter:
+    """
+        This is here to calculate the central weights of events that don't use LeptonInjector 
+        We really just get the flux from the pre-calculated fluxes, and then return that flux 
+
+        Livetimes and event numbers are handled by the fill_cache function
+    """
     def __init__(self, h5_file: str):
         if not os.path.exists(h5_file):
             Logger.Fatal("Cannot make Weighter! No such nus_atm file {} ".format(h5_file))
         self.nus_atm = nsq.nuSQUIDSAtm( h5_file )
 
     def __call__(self, event:LW.Event)->float:
+        """
+            Note: this uses LW events rather than NuIsanceFit events for compatability with the other weighters 
+        """
         # this_value = nus_atm.EvalFlavor(flavor, angle, reg_energy, 1)
         primary = float(event.primary_type)
         nutype = 0 if primary>0 else 1
@@ -140,9 +149,9 @@ class Data:
             self._promptFluxWeighter = LW.Weighter(LW.nuSQUIDSAtmFlux(self.steering["resources"]["prompt_atmo_flux"]),self._xs_obj, self._lic_files)
             self._astroFluxWeighter =  LW.Weighter(LW.nuSQUIDSAtmFlux(self.steering["resources"]["astro_file"]),self._xs_obj, self._lic_files)
         else:
-            self._convFluxWeighter =   None
-            self._promptFluxWeighter = None
-            self._astroFluxWeighter =  None
+            self._convFluxWeighter =   SimpleWeighter(self.steering["resources"]["conv_atmo_flux"])
+            self._promptFluxWeighter = SimpleWeighter(self.steering["resources"]["prompt_atmo_flux"])
+            self._astroFluxWeighter =  SimpleWeighter(self.steering["resources"]["astro_file"])
 
         self._barr_resources = self._load_barr_resources()
 
@@ -408,7 +417,7 @@ class Data:
                 if _bjy[i_event]>0:
                     new_event.setIntY( _bjy[i_event])
                 new_event.setSnowStormParams( list(_snow_storm_params[_snowstorm_ref[i_event]]) )
-                # self._fillCache(new_event) <-- we need new weighters to do this 
+                self._fillCache(new_event) 
 
             target_hist.add(new_event, new_event.energy, new_event.zenith, new_event.azimuth, new_event.topology, new_event.year)
 

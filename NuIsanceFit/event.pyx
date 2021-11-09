@@ -3,6 +3,9 @@ from libcpp cimport bool
 from numbers import Number
 """
 Here, we describe the Event classes and methods for interacting with the events 
+
+We define our own events, rather than use the LW ones, so that we can use the cython optimizations
+Otherwise we'd have to use the python-stack when working with these even objects 
 """
 
 def EventCache(float cache_weight, float livetime):
