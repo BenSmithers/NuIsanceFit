@@ -28,11 +28,14 @@ class Fitter:
     def get_edges(self):
         return self._data.simulation.edges
 
-    def get_expectation(self,params):
+    def get_expectation(self,params, topology='both'):
+        """
+            Returns the expected number of events in each bin
+        """
         if not isinstance(params, ParamPoint):
             Logger.Fatal("Arg 'param' must be {}, not {}".format(ParamPoint, type(params)))
 
-        self._llhobj._simWeighter.configure(params.as_dict())
+        self._llhobj._SimReWeighter.configure(params.as_dict())
 
 
         sim = self._data.simulation
@@ -46,7 +49,7 @@ class Fitter:
             result = [0 for j in range(len(dataobj))]
             for j in range(len(dataobj)):
                 for event in dataobj[j][0][0][0]:
-                    result[j] += self._llhobj._simWeighter(event)
+                    result[j] += self._llhobj._SimReWeighter(event)
             return result
 
         #for i in range(dims[0]):
