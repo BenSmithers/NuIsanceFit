@@ -1,4 +1,4 @@
-from libc.math cimport pi, cos, log10
+from libc.math cimport pi, cos, log10, acos
 from libcpp cimport bool
 from numbers import Number
 """
@@ -26,7 +26,9 @@ def EventCache(float cache_weight, float livetime):
     this_dict["convWeight"] = cache_weight
     this_dict["promptWeight"] = cache_weight
     this_dict["astroMuWeight"] = cache_weight
-    
+    this_dict["convPionWeight"] = cache_weight
+    this_dict["convKaonWeight"] = cache_weight
+
     # barr cache
     this_dict["barrModWP"] = cache_weight
     this_dict["barrModWM"] = cache_weight
@@ -66,8 +68,8 @@ cdef class Event:
         self._logPrimaryEnergy = 0.0
 
         self._primaryAzimuth = 0.0
-        self._primaryZenith = 0.0
-        self._rawPrimaryZenith = 0.0
+        self._primaryZenith = 0.0 #COS THETA
+        self._rawPrimaryZenith = 0.0  # same as rawPrimaryZenith, but radians
         self._primaryType = 0
         self._finalType0 = 0
         self._finalType1 = 0
@@ -78,6 +80,7 @@ cdef class Event:
         self._oneWeight = 0.0
         self._num_events = 1
 
+        # these are reconstructed values
         self._energy = 0.0
         self._logEnergy = 0.0
         self._zenith = 0.0
@@ -121,25 +124,25 @@ cdef class Event:
         self._primaryAzimuth = azimuth
     def setPrimaryZenith(self, float zenith):
         if (zenith<-1) or (zenith>1):
-            raise ValueError("Invalid zenith {}. Is this in degrees? It should be radians!".format(zenith))
+            raise ValueError("Invalid zenith {}. Should be in cos(theta)".format(zenith))
         self._primaryZenith =zenith
-    def setTotalColumnDepth(self, float totalColumnDepth):
-        if totalColumnDepth<0:
-            raise ValueError("TCD cannot be negative: {}".format(totalColumnDepth))
-        self._totalColumnDepth = totalColumnDepth
+        self._rawPrimaryZenith = acos(zenith)
     def setRawZenith(self, float rawzenith):
         """
         This sets both the raw zenith and the zenith
         """
         if rawzenith>pi and rawzenith<(pi+1e-5):
             self._rawPrimaryZenith = pi
-            self.setPrimaryZenith(-1)
+            self._primaryZenith = -1
         else:
             if not ((rawzenith>0) and (rawzenith<=pi)):
                 raise ValueError("Zenith angle should be between 0 and pi, got {}".format(rawzenith))
             self._rawPrimaryZenith = rawzenith
-            self.setPrimaryZenith(cos(self._rawPrimaryZenith))
-
+            self._primaryZenith = cos(self._rawPrimaryZenith)
+    def setTotalColumnDepth(self, float totalColumnDepth):
+        if totalColumnDepth<0:
+            raise ValueError("TCD cannot be negative: {}".format(totalColumnDepth))
+        self._totalColumnDepth = totalColumnDepth
     def setIntX(self, float intX):
         if intX<0:
             raise ValueError("Cannot have negative Bjorken X {}".format(intX))
@@ -167,7 +170,7 @@ cdef class Event:
         self._azimuth = azimuth
     def setZenith(self, float zenith):
         if (zenith<-1) or (zenith>1):
-            raise ValueError("Invalid zenith {}. Is this in degrees? It should be radians!".format(zenith))
+            raise ValueError("Invalid zenith {}. Should be cos(theta)".format(zenith))
         self._zenith =zenith
     def setTopology(self, int topology):
         if topology not in [0,1]:

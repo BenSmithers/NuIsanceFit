@@ -178,6 +178,8 @@ cdef class TopoWeighter(FluxCompWeighter):
         else:
             raise ValueError("Unsupported track topology for the topology weighter! {}".format(event.getTopology()))
 
+        if access_topo not in self.spline_map[self.fluxComp]:
+            return 1.0
         cdef float correction = self.spline_map[self.fluxComp][access_topo]((event.getLogPrimaryEnergy(), event.getPrimaryZenith()  , self.scale_factor))
         
         if isnan(correction):
@@ -197,6 +199,9 @@ cdef class AttenuationWeighter(FluxCompWeighter):
 
     cpdef float evalEvt(self,Event event):
         cdef float correction
+        if event.getPrimaryType() not in self.spline_map[self.fluxComp]:
+            return 1.0
+
         if event._primaryType>0:
             correction = self.spline_map[self.fluxComp][event.getPrimaryType()]((event.getLogPrimaryEnergy(), event.getPrimaryZenith(), self.scale_nu))
         else:
@@ -254,9 +259,9 @@ def fill_fluxcomp_dict(str folder):
         if "mu" in subComponent.lower():
             pid = 13
         elif "e" in subComponent.lower():
-            pid = 15
+            pid = 11
         elif "tau" in subComponent.lower():
-            pid = 17
+            pid = 15
         else:
             use_subc = True
         if "nu" in subComponent.lower():
