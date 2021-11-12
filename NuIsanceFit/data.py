@@ -11,6 +11,8 @@ import os
 from math import log10, cos, sqrt, pi
 from glob import glob
 
+too_many = 1e6
+
 try:
     import nuSQuIDS as nsq
 except ImportError:
@@ -34,6 +36,7 @@ class SimpleWeighter:
         if not os.path.exists(h5_file):
             Logger.Fatal("Cannot make Weighter! No such nus_atm file {} ".format(h5_file))
         self.nus_atm = nsq.nuSQUIDSAtm( h5_file )
+        Logger.Trace("Loaded flux with bounds {}".format(self.nus_atm.GetCosthRange()))
 
     def __call__(self, event:LW.Event)->float:
         """
@@ -52,7 +55,21 @@ class SimpleWeighter:
         else:
             Logger.Fatal("non-neutrino event! PDG: {}".format(primary))
 
-        return self.nus_atm.EvalFlavor(flavor,cos(event.zenith), event.energy*(1e9), nutype)
+
+        try:
+            value = self.nus_atm.EvalFlavor(flavor,cos(event.zenith), event.energy*(1e9), nutype)
+            return value
+        except RuntimeError:
+            langle = cos(event.zenith)
+            if langle<-0.999:
+                return self.nus_atm.EvalFlavor(flavor,-0.998, event.energy*(1e9), nutype)
+            elif langle>0.999:
+                return self.nus_atm.EvalFlavor(flavor,0.998, event.energy*(1e9), nutype)
+            else:
+                print("energy: {}".format(event.energy*(1e9)))
+                print("Angle: {}".format(event.zenith))
+                print("cos(angle) {}".format(cos(event.zenith)))
+                raise Exception()
 
 
         
@@ -123,7 +140,7 @@ class Data:
         self._azimuthEdges = make_edges(bins, "azimuth")
         self._topoEdges = [-0.5, 0.5, 1.5] # only two bins to catch 0 and 1
         self._timeEdges = make_edges(bins, "year") 
-        self._livetime = 1.0 # this should come from the steering 
+        self._livetime = 8*(3600*24*365*0.99) # this should come from the steering 
 
         # year, azimuth, zenith, energy  
         # ENERGY | COSTH | AZIMUTH | TOPOLOGY | TIME
@@ -214,7 +231,7 @@ class Data:
                                     print("Should be at least one")
                                     made_it = True
                                 evt_params = event.snowStormParams
-                                n_eff = event.oneWeight*temporary_fluxfunc(event.primaryEnergy)
+                                n_eff = event._cachedweight["convWeight"]
 
                                 for i_param in range(len(self._ss_param_centers)):
                                     if evt_params[i_param]>self._ss_param_centers[i_param]:
@@ -395,8 +412,17 @@ class Data:
         i_max = len(_e_reco)
         while i_event < i_max:
             new_event = Event()
+            
             new_event.setEnergy(  _e_reco[i_event] )
             new_event.setZenith( cos(_z_reco[i_event]) )
+            if new_event.zenith > 0.2:
+                i_event+=1 
+                continue
+
+            if _e_true[i_event]>(1e6):
+                i_event+=1
+                continue
+
             new_event.setAzimuth( _a_reco[i_event] )
             new_event.setTopology( 0 if _track[i_event]>_casc[i_event] else 1 ) 
             new_event.setYear( 0 ) #TODO change this when you want to bin in time     
@@ -405,6 +431,9 @@ class Data:
                 new_event.setPrimaryEnergy(  _e_true[i_event] )
                 new_event.setPrimaryAzimuth( _a_true[i_event] )
                 new_event.setRawZenith( _z_true[i_event] ) 
+                if new_event.primaryZenith>0.2:
+                    i_event+=1
+                    continue
                 new_event.setPrimaryType(int(_prim[i_event]))                
                 #new_event.setFinalType0(int(_fs0[i_event][5]))
                 #new_event.setFinalType1(int(_fs1[i_event][5]))
@@ -424,7 +453,7 @@ class Data:
             if i_event%25000==0:
                 Logger.Log("Loaded {} Events so far".format(i_event))
             i_event+=1 
-            if i_event>2e6:
+            if i_event>too_many:
                 Logger.Log("That's too many for one file!")
                 break
         data.close()
@@ -486,7 +515,7 @@ class Data:
                 Logger.Log("Loaded {} Events so far".format(i_event))
             i_event+=1 
 
-            if i_event>2e6:
+            if i_event>too_many:
                 Logger.Log("That's too many for one file!")
                 break
         data.close()
@@ -542,7 +571,7 @@ class Data:
                 Logger.Log("Loaded {} Events so far".format(i_event))
             i_event+=1 
 
-            if i_event>2e6:
+            if i_event>too_many:
                 Logger.Log("That's too many for one file!")
                 break
 
