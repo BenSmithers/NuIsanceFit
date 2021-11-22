@@ -8,6 +8,35 @@ from math import pi
 import matplotlib
 import matplotlib.pyplot as plt 
 
+def get_lower(x:float, domain: list):
+    """
+    Cython implementation of the get_lower function. Ues a binary search to find the bin to the left of "x" in "domain"
+    """
+    if (len(domain)<=1):
+        raise ValueError("Get_lower function only works on domains of length>1. This is length {}".format(len(domain)))
+
+    if (x<domain[0] or x>domain[-1]):
+        return -1
+    
+    min_abs=0
+    max_abs=len(domain)-1
+    lower_bin = int((max_abs-min_abs)/2)
+    upper_bin = lower_bin+1
+
+    while (not (domain[lower_bin]<=x and domain[upper_bin]>=x)):
+        if (x<domain[lower_bin]):
+            max_abs=lower_bin
+        
+        if (x>domain[upper_bin]):
+            min_abs=upper_bin
+        
+
+        lower_bin = min_abs + int((max_abs-min_abs)/2)
+        upper_bin = lower_bin + 1
+    
+    return lower_bin
+
+
 def get_color(n, colormax=3.0, cmap="viridis"):
     """
     I use this script to get colors out of a colormarp. Super useful for plotting 
