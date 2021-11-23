@@ -65,21 +65,33 @@ class GaussianPrior(Prior):
         return log(self.norm)-(z*z)/2 
 
     def inverse(self) -> float:
-        return self.stddev*randn() + self.mean
+        if np.isinf(self.stddev):
+            return self.mean
+        else:
+            return self.stddev*randn() + self.mean
 
 class LimitedGaussianPrior(Prior):
     def __init__(self, mean, stddev, minval, maxval):
         # these two will enforce type-ing! 
         self.limits = UniformPrior(minval, maxval)
         self.prior = GaussianPrior(mean, stddev)
-    
+        if mean <minval or mean>maxval:
+            Logger.Warn("Making Limited Gaussian prior where the mean {} is outside the bounds ({}, {})".format(mean, minval, maxval))
+
     def __call__(self,x):
         return self.limits(x) + self.prior(x)
 
     def inverse(self) -> float:
+        max_iter = 10000
+
+        counter = 0
         value = self.limits.min
         while (value<=self.limits.min or value>=self.limits.max):
             value = self.prior.inverse()
+            counter += 1 
+            if counter >= max_iter:
+                print("mean {}, stdev {}, min {}, max {}".format(self.prior.mean, self.prior.stddev, self.limits.min, self.limits.max ))    
+                raise ValueError("Infinite loop caught, killed")
         return value 
 
 class Gaussian2DPrior(Prior):
@@ -239,6 +251,7 @@ class ParamPoint:
         self.values = {}
 
         for key in params.keys():
+            # reseed True causes this thing to linger and never finish for some damn reason! What the hell! 
             if reseed:
                 self.values[str(key)] = params[key].inverse()
             else:
@@ -296,7 +309,7 @@ class PriorSet:
         #                                                 params["astro1Comp2DNorm"].width,  params["astro1Comp2DDeltaGamma"].width, 
         #                                                 self.astro_cor)
 
-    def __call__(self, these_params):
+    def __call__(self, these_params:ParamPoint):
         value = 0.0
         # add up contributions from the procedural ones
         for key in params:
