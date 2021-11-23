@@ -5,6 +5,7 @@ from NuIsanceFit.param import ParamPoint
 from NuIsanceFit.data import Data
 from NuIsanceFit.event import Event
 from NuIsanceFit.utils import get_lower
+from NuIsanceFit.logger import Logger
 from NuIsanceFit.weighter import FluxComponent
 
 from torch import tensor
@@ -77,8 +78,16 @@ def fill_fluxcomp_dict(folder:str):
 class SimReWeighter:
     """
     This object can take a set of parameters and create a Meta-MetaWeighter that weights events according to that set of parameters 
-
     Note that the weights are only meaningful in a relative sense. We don't care about constants 
+
+    For each Weighter, we keep a tensor of a proto-weight that we rescale. Sometimes the rescaling is linear, sometimes not. It speeds things up to keep it that way
+        so we don't have to re-calculate splines and such. Tensors are the way to go! 
+
+    Unfortunately, that means we need to keep a lot of stuff around in memory
+        ~ 30 x 30 x (time bins) x (azimuth bins) x 2 x (max events) * 8 bytes per = could be... a lot 
+        for each weighter! 
+
+    We keep these in memory as sparse tensors, which should dramatically reduce the memory usage, but we'll see 
     """
     def __init__(self, data:Data)->None:
         """
@@ -87,6 +96,35 @@ class SimReWeighter:
         """
         self._data = data
         self._steering = data.steering
+
+        self.maxsize = 1
+        # find the maxdim for when we make the sparse tensors
+        shape = np.shape(self.simulation.fill)
+        for i_e in range(shape[0]): #energy
+            for i_c in range(shape[1]): # costheta
+                for i_a in range(shape[2]): # azimuth
+                    for i_t in range(shape[3]): # topology 
+                        for i_y in range(shape[4]): # year/time
+                            if len(self.simulation[i_e,i_c,i_a,i_t,i_y])>self.maxsize:
+                                self.maxsize=len(self.simulation[i_e,i_c,i_a,i_t,i_y])
+
+        # kinda silly, but now we need to find the "ones" sparse tensor that can be used by the weighters. 
+        # we can't just add "1" to sparse tensors, we need to specifically tell it which entries have 1.... 
+        ones = tensor(np.zeros(shape=list(np.shape(self.simulation.fill)) + [self.maxsize]))
+        for i_e in range(shape[0]): #energy
+            for i_c in range(shape[1]): # costheta
+                for i_a in range(shape[2]): # azimuth
+                    for i_t in range(shape[3]): # topology 
+                        for i_y in range(shape[4]): # year/time
+                            e_bin = self.simulation[i_e,i_c,i_a,i_t,i_y]
+                            for i_bin in range(len(e_bin)):
+                                ones[i_e,i_c,i_a,i_t,i_y,i_bin] = 1.0
+        self.ones = ones.to_sparse()
+    
+
+        if self.maxsize>10000:
+            Logger.Warn("Dense tensors might wind up pretty big")
+
 
         resources = self._steering["resources"]
 
@@ -149,9 +187,10 @@ class Weighter:
     def __init__(self, parent: SimReWeighter, **kwargs):
         self._parent = parent
 
-        shape = np.shape(self._parent.simulation.fill)
+        shape = np.shape( list( self._parent.simulation.fill ) + [self._parent.maxsize] )
         self._weights = tensor(np.zeros(shape=shape))
-        self._reweight()
+        self._reweight(**kwargs)
+        self._weights.to_sparse()
 
         if not hasattr(self, "index"):
             raise NotImplementedError("You forgot to implement an \"index\" attribute!")
@@ -163,13 +202,16 @@ class Weighter:
                 for i_a in range(shape[2]): # azimuth
                     for i_t in range(shape[3]): # topology 
                         for i_y in range(shape[4]): # year/time
-                            for event in self._parent.simulation[i_e,i_c,i_a,i_t,i_y]:
-                                self._weights[i_e,i_c,i_a,i_t,i_y] += self._weight(event)
+                            ebin = self._parent.simulation[i_e,i_c,i_a,i_t,i_y]
+                            for i_bin in range(len( ebin )):
+                                self._weights[i_e,i_c,i_a,i_t,i_y,i_bin] = self._weight(ebin[i_bin], **kwargs)
 
     def _weight(self, event: Event):
         raise NotImplementedError()
 
     def __call__(self, params:tensor) -> tensor:
+
+
         raise NotImplementedError()
 
 
@@ -193,7 +235,7 @@ class AtmosphericUncertaintyWeighter(SplineWeighter):
         SplineWeighter.__init__(self, parent, spline)
 
     def __call__(self, params:tensor)->tensor:
-        return 1.0 + params[self.index]*self._weights
+        return self._parent.ones + params[self.index]*self._weights
 
 class AntiparticleWeighter(Weighter):
     """
@@ -208,7 +250,7 @@ class AntiparticleWeighter(Weighter):
 
     def __call__(self, params:tensor)->tensor:
         balance = params[self.index]*self._weights
-        balance[balance<0] = 2.0 + balance
+        balance[balance<0] = 2*self._parent.ones + balance 
         return balance
 
 class CachedValueWeighter(Weighter):
@@ -251,10 +293,68 @@ class PowerLawTiltWeighter(Weighter):
         self.index = _ex_pp.valid_keys.index(delta_key)
         Weighter.__init__(self, parent)
 
-        raise NotImplementedError("This one's actually tricky")
-        
     def _weight(self, event: Event):
         return (event.getPrimaryEnergy()/self.medianEnergy)
 
     def __call__(self, params:tensor)->tensor:
-        return self._weights
+        return self._weights**params[self.index]
+
+class FluxCompWeighter(Weighter):
+    """
+    This is the attenuation weighter. It has a (energy, zenith) spline of attenuation for each possible combination of "FluxComponent" and "primaryType"
+    """
+    def __init__(self, parent:SimReWeighter, spline_map: dict, fluxComp:FluxComponent):
+        self.fluxComp = fluxComp
+        self.spline_map = spline_map
+
+        if not self.fluxComp in spline_map:
+            raise KeyError("Found no flux component {} in spline map, which has {}".format(self.fluxComp, spline_map.keys()))
+        for key in self.spline_map[self.fluxComp]:
+            if not isinstance(self.spline_map[self.fluxComp][key], SplineTable):
+                raise TypeError("Found entry in the spline map, {}:{}, which is not a spline. It's a {}".format(self.fluxComp, key, type(self.spline_map[self.fluxComp][key])))
+
+        Weighter.__init__(self, parent)
+
+
+class TopoWeighter(FluxCompWeighter):
+    """
+    This kind of weighter reweights the events according to their topologies. 
+    This is used by the 
+        DOMEfficiency Weighters
+        HQ DOM Efficiency Weighters
+        the Hole Ice Weighters
+    """
+    def __init__(self, parent:SimReWeighter, spline_map: dict, fluxComp:FluxComponent, key_scale:str):
+        self.index = _ex_pp.valid_keys.index(key_scale)
+        if not (self.fluxComp == FluxComponent.atmConv or self.fluxComp == FluxComponent.atmPrompt or self.fluxComp == FluxComponent.diffuseAstro_mu):
+            raise ValueError("Weighter configured with disallowed flux component: {}".format(self.fluxComp))
+        FluxCompWeighter.__init__( self, parent, spline_map, fluxComp)
+
+    def _weight(self, event: Event):
+        if self.fluxComp == FluxComponent.atmConv:
+            cache = event.getCache()["domEffConv"]
+        elif self.fluxComp == FluxComponent.atmPrompt:
+            cache = event.getCache()["domEffPrompt"]
+        elif self.fluxComp == FluxComponent.diffuseAstro_mu:
+            cache = event.getCache()["domEffAstro"]
+        else:
+            raise NotImplementedError("Should be unreachable")
+
+        if event.getTopology() == 0:
+            access_topo = "track"
+        elif event.getTopology() == 1:
+            access_topo = "cascade"
+        else:
+            raise ValueError("Unsupported track topology for the topology weighter! {}".format(event.getTopology()))
+
+        if access_topo not in self.spline_map[self.fluxComp]:
+            return 1.0
+        
+        raise NotImplementedError("Well well well")
+        correction = self.spline_map[self.fluxComp][access_topo]((event.getLogPrimaryEnergy(), event.getPrimaryZenith()  , 1.0 ))
+        
+        if np.isnan(correction):
+            # This is a cow? We just ignore cows? 
+            return 0.0
+        else: 
+            return 10**(correction - cache)
