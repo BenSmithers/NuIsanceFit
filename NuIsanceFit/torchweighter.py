@@ -8,6 +8,7 @@ from NuIsanceFit.utils import get_lower
 from NuIsanceFit.logger import Logger
 from NuIsanceFit.weighter import FluxComponent
 
+import torch
 from torch import tensor
 import numpy as np
 from glob import glob
@@ -24,6 +25,8 @@ def fill_fluxcomp_dict(folder:str):
 
     ret_dict = {}
     broken_up = []
+    use_subc=False
+
     for item in files:
         filename_list = os.path.split(item)[1]
 
@@ -75,6 +78,7 @@ def fill_fluxcomp_dict(folder:str):
 
     return ret_dict
 
+
 class SimReWeighter:
     """
     This object can take a set of parameters and create a Meta-MetaWeighter that weights events according to that set of parameters 
@@ -105,8 +109,8 @@ class SimReWeighter:
                 for i_a in range(shape[2]): # azimuth
                     for i_t in range(shape[3]): # topology 
                         for i_y in range(shape[4]): # year/time
-                            if len(self.simulation[i_e,i_c,i_a,i_t,i_y])>self.maxsize:
-                                self.maxsize=len(self.simulation[i_e,i_c,i_a,i_t,i_y])
+                            if len(self.simulation[i_e][i_c][i_a][i_t][i_y])>self.maxsize:
+                                self.maxsize=len(self.simulation[i_e][i_c][i_a][i_t][i_y])
 
         # kinda silly, but now we need to find the "ones" sparse tensor that can be used by the weighters. 
         # we can't just add "1" to sparse tensors, we need to specifically tell it which entries have 1.... 
@@ -116,14 +120,14 @@ class SimReWeighter:
                 for i_a in range(shape[2]): # azimuth
                     for i_t in range(shape[3]): # topology 
                         for i_y in range(shape[4]): # year/time
-                            e_bin = self.simulation[i_e,i_c,i_a,i_t,i_y]
+                            e_bin = self.simulation[i_e][i_c][i_a][i_t][i_y]
                             for i_bin in range(len(e_bin)):
                                 ones[i_e,i_c,i_a,i_t,i_y,i_bin] = 1.0
         self.ones = ones.to_sparse()
     
 
         if self.maxsize>10000:
-            Logger.Warn("Dense tensors might wind up pretty big")
+            Logger.Warn("Might run in to memory issues!")
 
 
         resources = self._steering["resources"]
@@ -168,14 +172,48 @@ class SimReWeighter:
         edges, values = self._extract_edges_values(self._ice_grad_data[1])
         self.ice_grad_1 = IceGradientWeighter(self, bin_edges=edges,gradient= values,scale_key= "icegrad1")
 
+        self.conv_flux_weighter = PowerLawTiltWeighter(self, self.medianConvEnergy, delta_key="CRDeltaGamma")
+        self.prompt_flux_weighter = PowerLawTiltWeighter(self, medianEnergy=self.medianPromptEnergy, delta_key="CRDeltaGamma")
+        self.astro_flux_weigter = PowerLawTiltWeighter(self, medianEnergy=self.astroPivotEnergy, delta_key="astroDeltaGamma")
+
+        self.convNorm_index = _ex_pp.valid_keys.index("convNorm")
+        self.promptNorm_index = _ex_pp.valid_keys.index("promptNorm")
+        self.astroNorm_index = _ex_pp.valid_keys.index("astroNorm")
+        self.pik_ratio_index = _ex_pp.valid_keys.index("piKRatio")
+
+        self.barrWP_index = _ex_pp.valid_keys.index("barrWP")   
+        self.barrZP_index = _ex_pp.valid_keys.index("barrZP")   
+        self.barrYP_index = _ex_pp.valid_keys.index("barrYP")   
+        self.barrWM_index = _ex_pp.valid_keys.index("barrWM")   
+        self.barrZM_index = _ex_pp.valid_keys.index("barrZM")   
+        self.barrYM_index = _ex_pp.valid_keys.index("barrYM")   
+
+
     @property 
     def simulation(self):
         return self._data.simulation
 
 
-    def __call__(self, params:ParamPoint)->tensor:
-        pass
+    def __call__(self, params:tensor)->tensor:
+        ice_grads = self.ice_grad_0(params)*self.ice_grad_1(params)
 
+        convComp = params[self.convNorm_index]*self.aduw(params)*self.kluw(params)*(self.convPionFlux(params) + params[self.pik_ratio_index]*self.convKaonFlux(params) 
+                    + params[self.barrWP_index]*self.barrWPComp(params) + params[self.barrYP_index]*self.barrYPComp(params) + params[self.barrZP_index]*self.barrZPComp(params)
+                    + params[self.barrWM_index]*self.barrWMComp(params) + params[self.barrYM_index]*self.barrYMComp(params) + params[self.barrZM_index]*self.barrZMComp(params)) \
+                    *self.conv_flux_weighter(params) \
+                    *ice_grads
+
+        promptComp = params[self.promptNorm_index]*self.promptFlux(params)*self.prompt_flux_weighter(params)
+                    
+        astroComp  = params[self.astroNorm_index]*self.astroMuFlux(params)*self.astro_flux_weigter(params)*ice_grads \
+                    *self.neuaneu_w(params)
+
+        return convComp+promptComp+astroComp
+
+    def _extract_edges_values(self, entry:np.ndarray )->tuple:
+        edges = np.append(entry[0], entry[1][-1])
+        values = entry[-1]
+        return( list(edges), list(values) )
 
 class Weighter:
     """
@@ -187,10 +225,12 @@ class Weighter:
     def __init__(self, parent: SimReWeighter, **kwargs):
         self._parent = parent
 
-        shape = np.shape( list( self._parent.simulation.fill ) + [self._parent.maxsize] )
+        shape = list(np.shape(  self._parent.simulation.fill )) + [self._parent.maxsize]
+        Logger.Log("Making Weighter with shape {}".format(shape))
+
         self._weights = tensor(np.zeros(shape=shape))
         self._reweight(**kwargs)
-        self._weights.to_sparse()
+        self._weights = self._weights.to_sparse()
 
         if not hasattr(self, "index"):
             raise NotImplementedError("You forgot to implement an \"index\" attribute!")
@@ -202,7 +242,7 @@ class Weighter:
                 for i_a in range(shape[2]): # azimuth
                     for i_t in range(shape[3]): # topology 
                         for i_y in range(shape[4]): # year/time
-                            ebin = self._parent.simulation[i_e,i_c,i_a,i_t,i_y]
+                            ebin = self._parent.simulation[i_e][i_c][i_a][i_t][i_y]
                             for i_bin in range(len( ebin )):
                                 self._weights[i_e,i_c,i_a,i_t,i_y,i_bin] = self._weight(ebin[i_bin], **kwargs)
 
@@ -226,7 +266,7 @@ class SplineWeighter(Weighter):
         Weighter.__init__(self, parent)
 
     def _weight(self, event: Event):
-        return self._spline((event.getLogPrimaryEnergy(), event.getPrimaryZenith())) #note: we already keep the event zenith in cosTh space 
+        return self._spline((event.logPrimaryEnergy, event.primaryZenith)) #note: we already keep the event zenith in cosTh space 
 
 
 class AtmosphericUncertaintyWeighter(SplineWeighter):
@@ -240,18 +280,19 @@ class AtmosphericUncertaintyWeighter(SplineWeighter):
 class AntiparticleWeighter(Weighter):
     """
     This is used to change the particle/antiparticle balance
+
+    the balance is centered around 0.0, a positive balance shifts it towards the antimatter 
     """
     def __init__(self, parent:SimReWeighter):
         self.index = _ex_pp.valid_keys.index("NeutrinoAntineutrinoRatio")
         Weighter.__init__(self, parent)
 
     def _weight(self, event: Event):
-        return  1.0 if event.getPrimaryType()<0 else -1.0
+        return  1.0 if event.primaryType<0 else -1.0
 
     def __call__(self, params:tensor)->tensor:
         balance = params[self.index]*self._weights
-        balance[balance<0] = 2*self._parent.ones + balance 
-        return balance
+        return balance + self._parent.ones
 
 class CachedValueWeighter(Weighter):
     def __init__(self, parent:SimReWeighter, key:str):
@@ -261,7 +302,7 @@ class CachedValueWeighter(Weighter):
         Weighter.__init__(self, parent)
         
     def _weight(self, event: Event):
-        return event.getCache()[self._key]
+        return event.cachedWeight[self._key]
 
     def __call__(self, params:tensor)->tensor:
         return self._weights
@@ -277,14 +318,14 @@ class IceGradientWeighter(Weighter):
         Weighter.__init__(self, parent)
     
     def _weight(self, event:Event):
-        gradbin = get_lower(event.getLogEnergy(), self._bin_edges)
+        gradbin = get_lower(event.logEnergy, self._bin_edges)
         if gradbin == -1:
             return 1.0
         rel = (1.0+self._gradient[gradbin])
         return rel
 
     def __call__(self,params:tensor)->tensor:
-        return self._weighs*params[self.index]
+        return self._weights*params[self.index]
         
 class PowerLawTiltWeighter(Weighter):
     def __init__(self, parent:SimReWeighter, medianEnergy:float, delta_key:str):
@@ -294,10 +335,13 @@ class PowerLawTiltWeighter(Weighter):
         Weighter.__init__(self, parent)
 
     def _weight(self, event: Event):
-        return (event.getPrimaryEnergy()/self.medianEnergy)
+        return (event.primaryEnergy/self._medianEnergy)
 
     def __call__(self, params:tensor)->tensor:
-        return self._weights**params[self.index]
+        if params[self.index]==0.:
+            return self._parent.ones #this would make it dense! Not good 
+        else:
+            return self._weights**float(params[self.index]) # I really hope this doesn't kill the weighting 
 
 class FluxCompWeighter(Weighter):
     """
@@ -332,11 +376,11 @@ class TopoWeighter(FluxCompWeighter):
 
     def _weight(self, event: Event):
         if self.fluxComp == FluxComponent.atmConv:
-            cache = event.getCache()["domEffConv"]
+            cache = event.cachedWeight["domEffConv"]
         elif self.fluxComp == FluxComponent.atmPrompt:
-            cache = event.getCache()["domEffPrompt"]
+            cache = event.cachedWeight["domEffPrompt"]
         elif self.fluxComp == FluxComponent.diffuseAstro_mu:
-            cache = event.getCache()["domEffAstro"]
+            cache = event.cachedWeight["domEffAstro"]
         else:
             raise NotImplementedError("Should be unreachable")
 
