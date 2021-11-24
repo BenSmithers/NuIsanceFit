@@ -4,6 +4,7 @@ from numbers import Number # parent of all numbers
 from math import sqrt, pi, log
 from numpy import random
 from numpy.random import rand, randn
+from torch import tensor
 
 from NuIsanceFit.logger import Logger
 
@@ -261,6 +262,8 @@ class ParamPoint:
         for kwarg in kwargs:
             if kwarg in self.values:
                 self.values[kwarg] = kwargs[kwarg]
+    def to_tensor(self)->tensor:
+        return tensor(list(self.values.values()), requires_grad=True)
 
     def set(self, attr, value):
         """
